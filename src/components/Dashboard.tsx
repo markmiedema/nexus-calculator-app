@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ProcessedData } from '../types';
+import { useFilteredData } from '../hooks/useFilteredData';
 import ExecutiveSummary from './report/ExecutiveSummary';
 import StateAnalysis from './report/StateAnalysis';
 import ComplianceTimeline from './report/ComplianceTimeline';
@@ -15,10 +16,13 @@ const Dashboard: React.FC<DashboardProps> = ({ data }) => {
   const [activeTab, setActiveTab] = useState('summary');
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
 
+  // Use filtered data based on selected years
+  const filteredData = useFilteredData(data);
+
   const handleDownloadPDF = async () => {
     setIsGeneratingPDF(true);
     try {
-      await generatePDF(data);
+      await generatePDF(filteredData);
     } catch (error) {
       console.error('Error generating PDF:', error);
     } finally {
@@ -92,10 +96,10 @@ const Dashboard: React.FC<DashboardProps> = ({ data }) => {
       </div>
 
       <div className="p-6">
-        {activeTab === 'summary' && <ExecutiveSummary data={data} />}
-        {activeTab === 'states' && <StateAnalysis data={data} />}
-        {activeTab === 'timeline' && <ComplianceTimeline data={data} />}
-        {activeTab === 'recommendations' && <Recommendations data={data} />}
+        {activeTab === 'summary' && <ExecutiveSummary data={filteredData} />}
+        {activeTab === 'states' && <StateAnalysis data={filteredData} />}
+        {activeTab === 'timeline' && <ComplianceTimeline data={filteredData} />}
+        {activeTab === 'recommendations' && <Recommendations data={filteredData} />}
       </div>
     </div>
   );

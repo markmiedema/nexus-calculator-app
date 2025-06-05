@@ -1,5 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { Upload, AlertCircle, FileText, CheckCircle, X } from 'lucide-react';
+import ProgressIndicator from './ProgressIndicator';
 
 interface FileUploadProps {
   onFileUpload: (file: File) => void;
@@ -10,6 +11,7 @@ interface FileUploadProps {
 const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload, isProcessing, error }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
@@ -30,7 +32,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload, isProcessing, err
       const file = e.dataTransfer.files[0];
       if (file.type === 'text/csv' || file.name.endsWith('.csv')) {
         setSelectedFile(file);
-        onFileUpload(file);
+        handleProcessFile(file);
       }
     }
   };
@@ -39,7 +41,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload, isProcessing, err
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       setSelectedFile(file);
-      onFileUpload(file);
+      handleProcessFile(file);
     }
   };
 
@@ -49,9 +51,12 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload, isProcessing, err
     }
   };
 
-  const handleProcessFile = () => {
-    if (selectedFile) {
-      onFileUpload(selectedFile);
+  const handleProcessFile = async (file: File) => {
+    try {
+      setUploadProgress(0);
+      await onFileUpload(file);
+    } catch (error) {
+      console.error('Error processing file:', error);
     }
   };
 
@@ -114,7 +119,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload, isProcessing, err
                 <X className="h-5 w-5" />
               </button>
               <button
-                onClick={handleProcessFile}
+                onClick={() => handleProcessFile(selectedFile)}
                 disabled={isProcessing}
                 className={`px-4 py-2 rounded-md text-white flex items-center ${
                   isProcessing 
@@ -141,12 +146,10 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload, isProcessing, err
 
       {isProcessing && (
         <div className="mt-6">
-          <div className="w-full bg-gray-200 rounded-full h-2.5">
-            <div className="bg-blue-600 h-2.5 rounded-full animate-pulse w-full"></div>
-          </div>
-          <p className="text-sm text-gray-600 mt-2 text-center">
-            Processing your data... This may take a few moments.
-          </p>
+          <ProgressIndicator
+            progress={uploadProgress}
+            message="Processing your sales data..."
+          />
         </div>
       )}
 

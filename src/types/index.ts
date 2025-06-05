@@ -1,3 +1,20 @@
+// CSV data types
+export interface CSVRow {
+  date: string | number;
+  state: string;
+  sale_amount: string | number;
+  transaction_count?: string | number;
+  customer_address?: string;
+}
+
+export interface ProcessedCSVRow {
+  date: string;
+  state: string;
+  sale_amount: number;
+  transaction_count: number;
+  customer_address?: string;
+}
+
 // Sales data types
 export interface SalesDataRow {
   date: string;

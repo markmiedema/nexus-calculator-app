@@ -1,56 +1,67 @@
 import React from 'react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ReferenceLine, ResponsiveContainer } from 'recharts';
 import { MonthlyRevenue } from '../../types';
+import { APP_CONFIG } from '../../config';
 
 interface RevenueChartProps {
   stateData: MonthlyRevenue[];
-  nexusDate: string;
+  threshold: number;
 }
 
-const RevenueChart: React.FC<RevenueChartProps> = ({ stateData, nexusDate }) => {
-  // This is a simplified component that would show a line chart of revenue progression
-  // In a real implementation, this would use a charting library like Chart.js, Recharts, or similar
-  
-  // Sort the data by date
+const RevenueChart: React.FC<RevenueChartProps> = ({ stateData, threshold }) => {
+  // Sort and prepare cumulative data
   const sortedData = [...stateData].sort((a, b) => 
     new Date(a.date).getTime() - new Date(b.date).getTime()
   );
   
-  // Find the maximum revenue for scaling
-  const maxRevenue = Math.max(...sortedData.map(item => item.revenue));
-  
-  // Find the index of the nexus date
-  const nexusDateObj = new Date(nexusDate);
-  const nexusIndex = sortedData.findIndex(item => 
-    new Date(item.date) >= nexusDateObj
-  );
+  let cumulative = 0;
+  const chartData = sortedData.map(item => {
+    cumulative += item.revenue;
+    return {
+      month: new Date(item.date).toLocaleDateString('en-US', APP_CONFIG.dateFormats.chart),
+      revenue: item.revenue,
+      cumulative: cumulative,
+      transactions: item.transactions
+    };
+  });
+
+  const formatCurrency = (value: number) => `$${value.toLocaleString()}`;
 
   return (
-    <div className="h-full flex flex-col">
-      <div className="text-center mb-2">
-        <p className="text-gray-500 text-sm">Monthly Revenue Progression</p>
-      </div>
-      
-      <div className="w-full flex-grow bg-gray-100 rounded-md flex items-center justify-center">
-        <p className="text-gray-400 text-sm">
-          Line chart visualization would render here, showing revenue over time with nexus threshold marked
-        </p>
-      </div>
-      
-      <div className="mt-2 flex justify-between text-xs">
-        <div className="flex items-center">
-          <div className="w-3 h-1 bg-blue-500 mr-1"></div>
-          <span className="text-gray-600">Revenue</span>
-        </div>
-        <div className="flex items-center">
-          <div className="w-3 h-1 bg-red-500 mr-1"></div>
-          <span className="text-gray-600">Nexus Threshold</span>
-        </div>
-        <div className="flex items-center">
-          <div className="w-1 h-3 bg-green-500 mr-1"></div>
-          <span className="text-gray-600">Nexus Date: {nexusDate}</span>
-        </div>
-      </div>
-    </div>
+    <ResponsiveContainer width="100%" height="100%">
+      <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke={APP_CONFIG.chartColors.grid} />
+        <XAxis dataKey="month" />
+        <YAxis tickFormatter={formatCurrency} />
+        <Tooltip 
+          formatter={(value: number) => formatCurrency(value)}
+          labelStyle={{ color: '#333' }}
+        />
+        <Legend />
+        <Line 
+          type="monotone" 
+          dataKey="revenue" 
+          stroke={APP_CONFIG.chartColors.secondary}
+          strokeWidth={2}
+          name="Monthly Revenue"
+          dot={{ r: 3 }}
+        />
+        <Line 
+          type="monotone" 
+          dataKey="cumulative" 
+          stroke={APP_CONFIG.chartColors.primary}
+          strokeWidth={3}
+          name="Cumulative Revenue"
+          dot={{ r: 3 }}
+        />
+        <ReferenceLine 
+          y={threshold} 
+          stroke={APP_CONFIG.chartColors.danger}
+          strokeDasharray="5 5"
+          label={{ value: "Nexus Threshold", position: "right" }}
+        />
+      </LineChart>
+    </ResponsiveContainer>
   );
 };
 

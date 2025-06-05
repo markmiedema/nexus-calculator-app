@@ -6,23 +6,40 @@ import { determineStateThresholds } from '../constants/stateThresholds';
 import { getStateTaxRate } from '../constants/taxRates';
 import * as XLSX from 'xlsx';
 
-interface AnnualSales {
-  [year: string]: {
-    totalRevenue: number;
-    transactionCount: number;
-    monthlyRevenue: MonthlyRevenue[];
-    firstTransactionDate: string;
-  };
-}
+// Progress callback type
+type ProgressCallback = (progress: number) => void;
 
-interface StateSales {
-  [stateCode: string]: {
-    annualSales: AnnualSales;
-    totalRevenue: number;
-    transactionCount: number;
-    monthlyRevenue: MonthlyRevenue[];
-  };
-}
+// Batch processing for large datasets
+const processBatch = <T>(
+  items: T[],
+  batchSize: number,
+  processor: (batch: T[]) => void,
+  onProgress?: ProgressCallback
+): Promise<void> => {
+  return new Promise((resolve) => {
+    let index = 0;
+    
+    const processNextBatch = () => {
+      const batch = items.slice(index, index + batchSize);
+      if (batch.length === 0) {
+        resolve();
+        return;
+      }
+      
+      processor(batch);
+      index += batchSize;
+      
+      if (onProgress) {
+        onProgress(Math.min(100, Math.round((index / items.length) * 100)));
+      }
+      
+      // Use setTimeout to prevent blocking the UI
+      setTimeout(processNextBatch, 0);
+    };
+    
+    processNextBatch();
+  });
+};
 
 const formatExcelDate = (serial: number): string => {
   // Excel dates are number of days since 1900-01-01
@@ -33,6 +50,18 @@ const formatExcelDate = (serial: number): string => {
 
 const normalizeDateString = (dateStr: string): string => {
   // Handle various date formats
+  if (typeof dateStr === 'number') {
+    return formatExcelDate(dateStr);
+  }
+
+  // Handle MM/DD/YY format
+  const mmddyyRegex = /^(\d{1,2})\/(\d{1,2})\/(\d{2})$/;
+  if (mmddyyRegex.test(dateStr)) {
+    const [, month, day, year] = mmddyyRegex.exec(dateStr)!;
+    const fullYear = parseInt(year) < 50 ? `20${year}` : `19${year}`;
+    return `${fullYear}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+  }
+
   const date = new Date(dateStr);
   if (isNaN(date.getTime())) {
     throw new Error(`Invalid date format. Expected YYYY-MM-DD, got '${dateStr}'`);
@@ -40,13 +69,18 @@ const normalizeDateString = (dateStr: string): string => {
   return date.toISOString().split('T')[0];
 };
 
-export const processCSVData = async (file: File): Promise<ProcessedData> => {
+export const processCSVData = async (
+  file: File,
+  onProgress?: ProgressCallback
+): Promise<ProcessedData> => {
   try {
     // Read the file as array buffer
     const buffer = await readFileAsArrayBuffer(file);
+    if (onProgress) onProgress(10);
     
     // Parse workbook
     const workbook = XLSX.read(buffer, { type: 'array' });
+    if (onProgress) onProgress(20);
     
     // Combine data from all worksheets
     const combinedData: any[] = [];
@@ -55,26 +89,42 @@ export const processCSVData = async (file: File): Promise<ProcessedData> => {
       const sheetData = XLSX.utils.sheet_to_json(worksheet, { raw: false });
       combinedData.push(...sheetData);
     });
+    if (onProgress) onProgress(30);
 
-    // Process dates - handle both Excel dates and string dates
-    const processedData = combinedData.map(row => ({
-      ...row,
-      date: typeof row.date === 'number' 
-        ? formatExcelDate(row.date) 
-        : normalizeDateString(row.date)
-    }));
+    // Process dates in batches
+    const batchSize = 1000;
+    const processedData: any[] = [];
+    
+    await processBatch(
+      combinedData,
+      batchSize,
+      (batch) => {
+        const processed = batch.map(row => ({
+          ...row,
+          date: normalizeDateString(row.date)
+        }));
+        processedData.push(...processed);
+      },
+      (batchProgress) => {
+        if (onProgress) onProgress(30 + Math.floor(batchProgress * 0.2));
+      }
+    );
     
     // Validate the processed data
     validateCSV(processedData);
+    if (onProgress) onProgress(60);
     
     // Process the data to determine nexus by year
     const salesByState = aggregateSalesByState(processedData);
+    if (onProgress) onProgress(70);
     
     // Calculate nexus for each state based on annual thresholds
     const nexusStates = determineNexusStates(salesByState);
+    if (onProgress) onProgress(80);
     
     // Calculate tax liability
     const statesWithLiability = calculateTaxLiabilities(nexusStates);
+    if (onProgress) onProgress(90);
     
     // Determine priority states (highest liability)
     const priorityStates = [...statesWithLiability]
@@ -107,7 +157,7 @@ export const processCSVData = async (file: File): Promise<ProcessedData> => {
         transactionCount: 0
       };
       
-      // Calculate threshold proximity as a percentage, rounded to 2 decimal places
+      // Calculate threshold proximity as a percentage
       const revenueProximity = thresholds.revenue > 0 
         ? Number(((currentYearData.totalRevenue / thresholds.revenue) * 100).toFixed(2))
         : 0;
@@ -131,6 +181,8 @@ export const processCSVData = async (file: File): Promise<ProcessedData> => {
         taxRate: Number(taxRate.toFixed(2))
       };
     });
+
+    if (onProgress) onProgress(100);
     
     return {
       nexusStates: statesWithLiability,
