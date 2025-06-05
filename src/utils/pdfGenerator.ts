@@ -1,6 +1,12 @@
 import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import 'jspdf-autotable';
 import { ProcessedData } from '../types';
+
+declare module 'jspdf' {
+  interface jsPDF {
+    autoTable: (options: any) => jsPDF;
+  }
+}
 
 export const generatePDF = async (data: ProcessedData): Promise<void> => {
   try {
@@ -35,7 +41,7 @@ export const generatePDF = async (data: ProcessedData): Promise<void> => {
     if (nexusStates.length > 0) {
       pdf.text('Priority States Analysis', 20, 120);
       
-      autoTable(pdf, {
+      pdf.autoTable({
         startY: 130,
         head: [['State', 'Nexus Date', 'Registration Due', 'Est. Liability', 'Status']],
         body: priorityStates.map(state => {
@@ -62,7 +68,7 @@ export const generatePDF = async (data: ProcessedData): Promise<void> => {
     pdf.setFontSize(16);
     pdf.text('Detailed State Analysis', 20, 20);
     
-    autoTable(pdf, {
+    pdf.autoTable({
       startY: 30,
       head: [['State', 'Total Revenue', 'Nexus Date', 'Tax Rate', 'Est. Liability']],
       body: nexusStates.map(state => [
