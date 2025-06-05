@@ -6,7 +6,7 @@ import StateAnalysis from './report/StateAnalysis';
 import ComplianceTimeline from './report/ComplianceTimeline';
 import Recommendations from './report/Recommendations';
 import { Download, FileText, MapPin, Calendar, CheckSquare } from 'lucide-react';
-import { generatePDF } from '../utils/pdfGenerator';
+import { generatePDF } from '../utils/pdf-generator';
 
 interface DashboardProps {
   data: ProcessedData;
