@@ -91,6 +91,10 @@ export const processCSVData = async (
     });
     if (onProgress) onProgress(30);
 
+    // Validate the raw data immediately after reading
+    validateCSV(combinedData);
+    if (onProgress) onProgress(40);
+
     // Process dates in batches
     const batchSize = 1000;
     const processedData: any[] = [];
@@ -106,13 +110,9 @@ export const processCSVData = async (
         processedData.push(...processed);
       },
       (batchProgress) => {
-        if (onProgress) onProgress(30 + Math.floor(batchProgress * 0.2));
+        if (onProgress) onProgress(40 + Math.floor(batchProgress * 0.2));
       }
     );
-    
-    // Validate the processed data
-    validateCSV(processedData);
-    if (onProgress) onProgress(60);
     
     // Process the data to determine nexus by year
     const salesByState = aggregateSalesByState(processedData);
@@ -384,3 +384,20 @@ const determineFilingFrequency = (revenue: number): string => {
   if (revenue > 50000) return 'Quarterly';
   return 'Annually';
 };
+
+// Add missing type definition
+interface StateSales {
+  [stateCode: string]: {
+    annualSales: {
+      [year: string]: {
+        totalRevenue: number;
+        transactionCount: number;
+        monthlyRevenue: MonthlyRevenue[];
+        firstTransactionDate: string;
+      };
+    };
+    totalRevenue: number;
+    transactionCount: number;
+    monthlyRevenue: MonthlyRevenue[];
+  };
+}
