@@ -345,7 +345,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload, isProcessing, err
         </div>
       )}
 
-      {/* Format Requirements */}
+      {/* Enhanced Format Requirements */}
       <div className="mt-6 border-t border-gray-200 pt-4">
         <h3 className="text-sm font-medium text-gray-700 mb-3">Smart Column Detection</h3>
         <div className="grid md:grid-cols-2 gap-4 text-sm text-gray-600">
@@ -358,19 +358,45 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload, isProcessing, err
             </ul>
           </div>
           <div>
-            <h4 className="font-medium text-gray-700 mb-2">Optional Columns:</h4>
+            <h4 className="font-medium text-gray-700 mb-2">Optional Columns (enhanced):</h4>
             <ul className="space-y-1 list-disc pl-5">
               <li><strong>Quantity:</strong> transaction_count, qty, units, etc.</li>
               <li><strong>City:</strong> city, customer_city, billing_city, etc.</li>
-              <li><strong>County:</strong> county, customer_county, billing_county, etc.</li>
+              <li><strong>County:</strong> county, customer_county, parish, borough, etc.</li>
               <li><strong>Zip Code:</strong> zip_code, zip, postal_code, etc.</li>
             </ul>
           </div>
         </div>
-        <div className="mt-3 p-3 bg-blue-50 rounded-md">
-          <p className="text-sm text-blue-700">
-            <strong>Smart Detection:</strong> Our system automatically identifies columns using fuzzy matching, 
-            supporting various naming conventions and formats. No need to rename your columns!
+        
+        {/* Enhanced Template Information */}
+        <div className="mt-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
+          <h4 className="font-medium text-blue-800 mb-2">📋 Enhanced Template Features</h4>
+          <div className="grid md:grid-cols-2 gap-3 text-sm text-blue-700">
+            <div>
+              <p className="font-medium mb-1">✨ What's New:</p>
+              <ul className="space-y-1 text-xs">
+                <li>• Comprehensive geographic data (city, county, zip)</li>
+                <li>• 20 sample transactions across major US markets</li>
+                <li>• Realistic county variations (parishes, boroughs)</li>
+                <li>• Enhanced nexus analysis capabilities</li>
+              </ul>
+            </div>
+            <div>
+              <p className="font-medium mb-1">🎯 Perfect For:</p>
+              <ul className="space-y-1 text-xs">
+                <li>• Multi-state e-commerce businesses</li>
+                <li>• Detailed geographic nexus analysis</li>
+                <li>• Local tax jurisdiction tracking</li>
+                <li>• Comprehensive compliance reporting</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+        
+        <div className="mt-3 p-3 bg-green-50 rounded-md border border-green-200">
+          <p className="text-sm text-green-700">
+            <strong>🚀 Smart Detection:</strong> Our enhanced system automatically identifies columns using fuzzy matching, 
+            supporting various naming conventions and formats. Now includes geographic data for more precise nexus analysis!
           </p>
         </div>
       </div>

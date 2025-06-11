@@ -273,15 +273,32 @@ export const generateColumnMappingPreview = (detectionResult: DetectionResult): 
   };
 };
 
-// Generate CSV template for download
+// Generate enhanced CSV template for download
 export const generateCSVTemplate = (): string => {
   const headers = ['date', 'state', 'sale_amount', 'transaction_count', 'city', 'county', 'zip_code'];
+  
+  // Enhanced sample data with realistic geographic information
   const sampleData = [
     ['2024-01-15', 'CA', '1500.00', '1', 'Los Angeles', 'Los Angeles County', '90210'],
     ['2024-01-16', 'TX', '2500.00', '2', 'Houston', 'Harris County', '77001'],
     ['2024-01-17', 'NY', '3000.00', '1', 'New York', 'New York County', '10001'],
     ['2024-01-18', 'FL', '1200.00', '1', 'Miami', 'Miami-Dade County', '33101'],
-    ['2024-01-19', 'WA', '1800.00', '3', 'Seattle', 'King County', '98101']
+    ['2024-01-19', 'WA', '1800.00', '3', 'Seattle', 'King County', '98101'],
+    ['2024-01-20', 'IL', '2200.00', '2', 'Chicago', 'Cook County', '60601'],
+    ['2024-01-21', 'GA', '1750.00', '1', 'Atlanta', 'Fulton County', '30301'],
+    ['2024-01-22', 'NC', '1350.00', '2', 'Charlotte', 'Mecklenburg County', '28201'],
+    ['2024-01-23', 'AZ', '1650.00', '1', 'Phoenix', 'Maricopa County', '85001'],
+    ['2024-01-24', 'CO', '1950.00', '3', 'Denver', 'Denver County', '80201'],
+    ['2024-01-25', 'NV', '1450.00', '1', 'Las Vegas', 'Clark County', '89101'],
+    ['2024-01-26', 'OR', '1600.00', '2', 'Portland', 'Multnomah County', '97201'],
+    ['2024-01-27', 'UT', '1300.00', '1', 'Salt Lake City', 'Salt Lake County', '84101'],
+    ['2024-01-28', 'TN', '1550.00', '2', 'Nashville', 'Davidson County', '37201'],
+    ['2024-01-29', 'OH', '1700.00', '1', 'Columbus', 'Franklin County', '43201'],
+    ['2024-01-30', 'PA', '1850.00', '3', 'Philadelphia', 'Philadelphia County', '19101'],
+    ['2024-01-31', 'MI', '1400.00', '1', 'Detroit', 'Wayne County', '48201'],
+    ['2024-02-01', 'VA', '1650.00', '2', 'Richmond', 'Richmond City', '23218'],
+    ['2024-02-02', 'MA', '2100.00', '1', 'Boston', 'Suffolk County', '02101'],
+    ['2024-02-03', 'WI', '1250.00', '2', 'Milwaukee', 'Milwaukee County', '53201']
   ];
 
   const csvContent = [
@@ -292,7 +309,7 @@ export const generateCSVTemplate = (): string => {
   return csvContent;
 };
 
-// Create and download CSV template file
+// Create and download enhanced CSV template file
 export const downloadCSVTemplate = (): void => {
   const csvContent = generateCSVTemplate();
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -301,11 +318,12 @@ export const downloadCSVTemplate = (): void => {
   if (link.download !== undefined) {
     const url = URL.createObjectURL(blob);
     link.setAttribute('href', url);
-    link.setAttribute('download', 'salt_nexus_template.csv');
+    link.setAttribute('download', 'salt_nexus_template_enhanced.csv');
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   }
 };
 
