@@ -5,6 +5,7 @@ import { calculateTaxLiability } from './taxCalculator';
 import { determineStateThresholds } from '../constants/stateThresholds';
 import { getStateTaxRate } from '../constants/taxRates';
 import { detectColumns, transformDataWithMapping, validateDetection, generateDetectionReport } from './columnDetection';
+import { cleanDataset, generateCleaningReport } from './dataCleaning';
 import * as XLSX from 'xlsx';
 
 // Progress callback type
@@ -115,26 +116,34 @@ export const processCSVData = async (
     const transformedData = transformDataWithMapping(combinedData, detectionResult.mapping);
     if (onProgress) onProgress(40);
 
-    // Validate the transformed data
-    validateCSV(transformedData);
+    // Clean the transformed data
+    const { cleanedData, report: cleaningReport } = cleanDataset(transformedData, detectionResult.mapping);
     if (onProgress) onProgress(45);
 
-    // Process dates in batches
+    // Log cleaning report for debugging
+    console.log('Data Cleaning Report:', generateCleaningReport(cleaningReport));
+
+    // Validate the cleaned data
+    validateCSV(cleanedData);
+    if (onProgress) onProgress(50);
+
+    // Process dates in batches (now working with cleaned data)
     const batchSize = 1000;
     const processedData: any[] = [];
     
     await processBatch(
-      transformedData,
+      cleanedData,
       batchSize,
       (batch) => {
         const processed = batch.map(row => ({
           ...row,
-          date: normalizeDateString(row.date)
+          // Dates should already be cleaned, but ensure they're in the right format
+          date: typeof row.date === 'string' ? row.date : normalizeDateString(row.date)
         }));
         processedData.push(...processed);
       },
       (batchProgress) => {
-        if (onProgress) onProgress(45 + Math.floor(batchProgress * 0.25));
+        if (onProgress) onProgress(50 + Math.floor(batchProgress * 0.25));
       }
     );
     
