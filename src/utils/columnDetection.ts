@@ -100,7 +100,10 @@ export const COLUMN_MAPPINGS: ColumnMapping = {
     'invoice_count',
     'invoice count',
     'sales_count',
-    'sales count'
+    'sales count',
+    'number_of_transactions',
+    'num_transactions',
+    'trans_count'
   ],
   city: [
     'city',
@@ -121,6 +124,25 @@ export const COLUMN_MAPPINGS: ColumnMapping = {
     'town',
     'municipality',
     'locality'
+  ],
+  county: [
+    'county',
+    'customer_county',
+    'customer county',
+    'billing_county',
+    'billing county',
+    'shipping_county',
+    'shipping county',
+    'ship_to_county',
+    'ship to county',
+    'bill_to_county',
+    'bill to county',
+    'destination_county',
+    'destination county',
+    'delivery_county',
+    'delivery county',
+    'parish',
+    'borough'
   ],
   zip_code: [
     'zip_code',

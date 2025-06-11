@@ -362,6 +362,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload, isProcessing, err
             <ul className="space-y-1 list-disc pl-5">
               <li><strong>Quantity:</strong> transaction_count, qty, units, etc.</li>
               <li><strong>City:</strong> city, customer_city, billing_city, etc.</li>
+              <li><strong>County:</strong> county, customer_county, billing_county, etc.</li>
               <li><strong>Zip Code:</strong> zip_code, zip, postal_code, etc.</li>
             </ul>
           </div>
