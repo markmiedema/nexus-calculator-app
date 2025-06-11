@@ -1,12 +1,15 @@
 import React, { useRef, useState } from 'react';
-import { Upload, AlertCircle, FileText, CheckCircle, X, Download, Info } from 'lucide-react';
+import { Upload, AlertCircle, FileText, CheckCircle, X, Download, Info, Cpu } from 'lucide-react';
 import ProgressIndicator from './ProgressIndicator';
 import WorkerStatus from './WorkerStatus';
+import ChunkProgressDisplay from './ChunkProgressDisplay';
 import ColumnMappingPreview from './ColumnMappingPreview';
 import { validateCSVWithSmartDetection, generateColumnMappingPreview, downloadCSVTemplate, ValidationResult } from '../utils/dataValidation';
 import { detectColumns } from '../utils/columnDetection';
 import { useWebWorker } from '../hooks/useWebWorker';
+import { useChunkedProcessing } from '../hooks/useChunkedProcessing';
 import { isWebWorkerSupported } from '../utils/workerFallback';
+import { calculateOptimalChunkSize } from '../utils/chunkProcessor';
 import * as XLSX from 'xlsx';
 
 interface FileUploadProps {
@@ -21,6 +24,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload, isProcessing, err
   const [uploadProgress, setUploadProgress] = useState(0);
   const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
   const [showPreview, setShowPreview] = useState(false);
+  const [processingStrategy, setProcessingStrategy] = useState<'chunked' | 'worker' | 'fallback'>('fallback');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Web Worker hook for background processing
@@ -41,6 +45,26 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload, isProcessing, err
     },
     onError: (error) => {
       console.error('Worker processing failed:', error);
+    }
+  });
+
+  // Chunked processing hook for large datasets
+  const {
+    processData: processWithChunks,
+    isProcessing: isChunkedProcessing,
+    progress: chunkProgress,
+    stats: chunkStats,
+    error: chunkError,
+    resetState: resetChunkState
+  } = useChunkedProcessing({
+    onProgress: (progress) => {
+      console.log(`Chunk progress: ${progress.overallProgress}%`);
+    },
+    onComplete: (results) => {
+      console.log('Chunked processing completed successfully');
+    },
+    onError: (error) => {
+      console.error('Chunked processing failed:', error);
     }
   });
 
@@ -124,6 +148,10 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload, isProcessing, err
       
       setUploadProgress(60);
       
+      // Determine optimal processing strategy
+      const strategy = determineProcessingStrategy(data.length);
+      setProcessingStrategy(strategy);
+      
       // Validate with smart detection
       const result = validateCSVWithSmartDetection(data);
       setValidationResult(result);
@@ -143,6 +171,50 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload, isProcessing, err
     }
   };
 
+  const determineProcessingStrategy = (dataSize: number): 'chunked' | 'worker' | 'fallback' => {
+    if (dataSize > 5000) {
+      return 'chunked';
+    } else if (dataSize > 1000 && isWebWorkerSupported()) {
+      return 'worker';
+    } else {
+      return 'fallback';
+    }
+  };
+
+  const getProcessingStrategyInfo = (strategy: string, dataSize: number) => {
+    switch (strategy) {
+      case 'chunked':
+        const config = calculateOptimalChunkSize(dataSize);
+        return {
+          name: 'Chunked Processing',
+          description: `Large dataset will be processed in ${Math.ceil(dataSize / config.optimalSize)} chunks using ${config.workerPoolSize} workers`,
+          icon: <Cpu className="h-4 w-4 text-purple-500" />,
+          color: 'purple'
+        };
+      case 'worker':
+        return {
+          name: 'Background Processing',
+          description: 'Medium dataset will be processed in the background using Web Workers',
+          icon: <Cpu className="h-4 w-4 text-blue-500" />,
+          color: 'blue'
+        };
+      case 'fallback':
+        return {
+          name: 'Main Thread Processing',
+          description: 'Small dataset will be processed on the main thread',
+          icon: <Cpu className="h-4 w-4 text-green-500" />,
+          color: 'green'
+        };
+      default:
+        return {
+          name: 'Standard Processing',
+          description: 'Data will be processed using the standard method',
+          icon: <Cpu className="h-4 w-4 text-gray-500" />,
+          color: 'gray'
+        };
+    }
+  };
+
   const handleProceedWithAnalysis = () => {
     if (selectedFile) {
       setShowPreview(false);
@@ -155,6 +227,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload, isProcessing, err
     setSelectedFile(null);
     setValidationResult(null);
     resetWorkerState();
+    resetChunkState();
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -204,23 +277,53 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload, isProcessing, err
 
   return (
     <div className="space-y-6">
-      {/* Worker Status Display */}
-      <WorkerStatus
-        isProcessing={isWorkerProcessing}
-        progress={workerProgress}
-        error={workerError}
-        isWorkerSupported={workerSupported}
-      />
+      {/* Processing Status Displays */}
+      {(isWorkerProcessing || isChunkedProcessing) && (
+        <div className="space-y-4">
+          {/* Worker Status */}
+          {isWorkerProcessing && (
+            <WorkerStatus
+              isProcessing={isWorkerProcessing}
+              progress={workerProgress}
+              error={workerError}
+              isWorkerSupported={workerSupported}
+            />
+          )}
+
+          {/* Chunked Processing Status */}
+          {isChunkedProcessing && chunkProgress && (
+            <ChunkProgressDisplay
+              progress={chunkProgress}
+              stats={chunkStats}
+            />
+          )}
+        </div>
+      )}
 
       <div className="bg-white rounded-lg shadow-md p-6">
         <div className="mb-6">
           <div className="flex items-center justify-between mb-2">
             <h2 className="text-xl font-semibold text-gray-800">Upload Sales Data</h2>
             <div className="flex items-center space-x-3">
+              {/* Processing Strategy Indicator */}
+              {selectedFile && validationResult?.isValid && (
+                <div className="flex items-center space-x-2 px-3 py-1 bg-gray-50 rounded-md">
+                  {(() => {
+                    const strategyInfo = getProcessingStrategyInfo(processingStrategy, 0);
+                    return (
+                      <>
+                        {strategyInfo.icon}
+                        <span className="text-xs text-gray-600">{strategyInfo.name}</span>
+                      </>
+                    );
+                  })()}
+                </div>
+              )}
+              
               {/* Worker Support Indicator */}
               <div className="flex items-center space-x-1 text-xs text-gray-500">
                 <div className={`w-2 h-2 rounded-full ${workerSupported ? 'bg-green-500' : 'bg-yellow-500'}`}></div>
-                <span>{workerSupported ? 'Background Processing' : 'Main Thread'}</span>
+                <span>{workerSupported ? 'Workers Supported' : 'Fallback Mode'}</span>
               </div>
               
               <button
@@ -236,7 +339,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload, isProcessing, err
             Upload a CSV or Excel file containing your sales data. Our smart detection will automatically 
             identify the correct columns for analysis.
             {workerSupported && (
-              <span className="text-green-600 font-medium"> Processing will run in the background for better performance.</span>
+              <span className="text-green-600 font-medium"> Large files will be processed efficiently using background workers.</span>
             )}
           </p>
         </div>
@@ -291,6 +394,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload, isProcessing, err
                     setSelectedFile(null);
                     setValidationResult(null);
                     resetWorkerState();
+                    resetChunkState();
                     if (fileInputRef.current) fileInputRef.current.value = '';
                   }}
                   className="text-gray-500 hover:text-gray-700"
@@ -304,6 +408,24 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload, isProcessing, err
                   progress={uploadProgress}
                   message="Validating file structure..."
                 />
+              )}
+
+              {/* Processing Strategy Info */}
+              {validationResult?.isValid && (
+                <div className="p-3 bg-blue-50 rounded-md">
+                  {(() => {
+                    const strategyInfo = getProcessingStrategyInfo(processingStrategy, 0);
+                    return (
+                      <div className="flex items-start space-x-2">
+                        {strategyInfo.icon}
+                        <div>
+                          <p className="text-sm font-medium text-blue-800">{strategyInfo.name}</p>
+                          <p className="text-xs text-blue-600 mt-1">{strategyInfo.description}</p>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
               )}
             </div>
           )}
@@ -381,19 +503,19 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload, isProcessing, err
         )}
 
         {/* Processing Error */}
-        {error && (
+        {(error || workerError || chunkError) && (
           <div className="mt-4 p-4 bg-red-50 text-red-700 rounded-md flex items-start space-x-3">
             <AlertCircle className="h-5 w-5 text-red-500 mt-0.5 flex-shrink-0" />
             <div>
               <p className="font-medium">Error processing file</p>
-              <p className="text-sm">{error}</p>
+              <p className="text-sm">{error || workerError || chunkError}</p>
             </div>
           </div>
         )}
 
         {/* Format Requirements */}
         <div className="mt-6 border-t border-gray-200 pt-4">
-          <h3 className="text-sm font-medium text-gray-700 mb-3">Smart Column Detection</h3>
+          <h3 className="text-sm font-medium text-gray-700 mb-3">Smart Column Detection & Processing</h3>
           <div className="grid md:grid-cols-2 gap-4 text-sm text-gray-600">
             <div>
               <h4 className="font-medium text-gray-700 mb-2">Required Columns (auto-detected):</h4>
@@ -415,15 +537,13 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload, isProcessing, err
           </div>
           <div className="mt-3 p-3 bg-blue-50 rounded-md">
             <p className="text-sm text-blue-700">
-              <strong>Smart Detection:</strong> Our system automatically identifies columns using fuzzy matching, 
-              supporting various naming conventions and formats. No need to rename your columns!
-              {workerSupported && (
-                <span className="block mt-1">
-                  <strong>Background Processing:</strong> Large files will be processed in the background 
-                  without freezing your browser.
-                </span>
-              )}
+              <strong>Smart Processing:</strong> Our system automatically chooses the best processing method based on your file size:
             </p>
+            <ul className="mt-2 text-xs text-blue-600 space-y-1">
+              <li>• <strong>Small files (&lt;1K rows):</strong> Fast main-thread processing</li>
+              <li>• <strong>Medium files (1K-5K rows):</strong> Background Web Worker processing</li>
+              <li>• <strong>Large files (&gt;5K rows):</strong> Chunked parallel processing with worker pool</li>
+            </ul>
           </div>
         </div>
       </div>

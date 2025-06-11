@@ -8,12 +8,13 @@ import { detectColumns, transformDataWithMapping, validateDetection, generateDet
 import { cleanDataset, generateCleaningReport } from './dataCleaning';
 import { useWebWorker } from '../hooks/useWebWorker';
 import { processCSVDataFallback, isWebWorkerSupported } from './workerFallback';
+import { processDataInChunks, ChunkProgress } from './chunkProcessor';
 import * as XLSX from 'xlsx';
 
 // Progress callback type
 type ProgressCallback = (progress: number) => void;
 
-// Enhanced CSV processor with Web Worker support
+// Enhanced CSV processor with chunked processing support
 export const processCSVData = async (
   file: File,
   onProgress?: ProgressCallback
@@ -41,56 +42,21 @@ export const processCSVData = async (
     
     if (onProgress) onProgress(30);
 
-    // Check if Web Workers are supported
-    if (isWebWorkerSupported()) {
-      // Use Web Worker for processing
-      return new Promise((resolve, reject) => {
-        const worker = new Worker(
-          new URL('../workers/csvProcessor.worker.ts', import.meta.url),
-          { type: 'module' }
-        );
+    // Determine processing strategy based on data size
+    const shouldUseChunkedProcessing = combinedData.length > 5000;
+    const shouldUseWebWorker = isWebWorkerSupported() && combinedData.length > 1000;
 
-        worker.onmessage = (event) => {
-          const { type, payload, progress, error } = event.data;
-
-          switch (type) {
-            case 'PROGRESS':
-              if (onProgress && progress !== undefined) {
-                // Adjust progress to account for file reading (30% already done)
-                const adjustedProgress = 30 + (progress * 0.7);
-                onProgress(adjustedProgress);
-              }
-              break;
-
-            case 'SUCCESS':
-              worker.terminate();
-              resolve(payload);
-              break;
-
-            case 'ERROR':
-              worker.terminate();
-              reject(new Error(error || 'Worker processing failed'));
-              break;
-          }
-        };
-
-        worker.onerror = (error) => {
-          worker.terminate();
-          reject(new Error(`Worker error: ${error.message}`));
-        };
-
-        // Send data to worker
-        worker.postMessage({
-          type: 'PROCESS_CSV',
-          payload: combinedData
-        });
-      });
+    if (shouldUseChunkedProcessing) {
+      // Use chunked processing for large datasets
+      return await processWithChunkedStrategy(combinedData, onProgress);
+    } else if (shouldUseWebWorker) {
+      // Use Web Worker for medium datasets
+      return await processWithWorkerStrategy(combinedData, onProgress);
     } else {
-      // Fallback to main thread processing
+      // Use fallback for small datasets
       if (onProgress) onProgress(35);
       return await processCSVDataFallback(combinedData, (progress) => {
         if (onProgress) {
-          // Adjust progress to account for file reading (35% already done)
           const adjustedProgress = 35 + (progress * 0.65);
           onProgress(adjustedProgress);
         }
@@ -101,6 +67,200 @@ export const processCSVData = async (
     console.error('Error processing file:', error);
     throw new Error(`Failed to process file: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
+};
+
+// Chunked processing strategy for very large datasets
+const processWithChunkedStrategy = async (
+  data: any[],
+  onProgress?: ProgressCallback
+): Promise<ProcessedData> => {
+  console.log(`Using chunked processing for ${data.length} rows`);
+  
+  // Initial validation and column detection
+  const rawHeaders = Object.keys(data[0]);
+  const detectionResult = detectColumns(rawHeaders);
+  const validationResult = validateDetection(detectionResult);
+  
+  if (!validationResult.isValid) {
+    const report = generateDetectionReport(detectionResult);
+    throw new Error(`Column detection failed:\n\n${report}\n\nErrors:\n${validationResult.errors.join('\n')}`);
+  }
+
+  if (onProgress) onProgress(35);
+
+  // Process data in chunks
+  const chunkResults = await processDataInChunks(
+    data,
+    async (chunk: any[], chunkIndex: number) => {
+      // Transform and clean chunk
+      const transformedChunk = transformDataWithMapping(chunk, detectionResult.mapping);
+      const { cleanedData } = cleanDataset(transformedChunk, detectionResult.mapping);
+      
+      // Return chunk results
+      return {
+        cleanedData,
+        chunkIndex,
+        rowCount: cleanedData.length
+      };
+    },
+    {
+      onProgress: (chunkProgress: ChunkProgress) => {
+        if (onProgress) {
+          // Map chunk progress to overall progress (35% to 85%)
+          const adjustedProgress = 35 + (chunkProgress.overallProgress * 0.5);
+          onProgress(adjustedProgress);
+        }
+      }
+    }
+  );
+
+  if (onProgress) onProgress(85);
+
+  // Combine chunk results
+  const allCleanedData: any[] = [];
+  chunkResults.forEach(result => {
+    allCleanedData.push(...result.cleanedData);
+  });
+
+  console.log(`Chunked processing completed: ${allCleanedData.length} valid rows from ${data.length} total`);
+
+  // Continue with aggregation and analysis
+  return await finalizeProcessing(allCleanedData, onProgress, 85);
+};
+
+// Web Worker processing strategy for medium datasets
+const processWithWorkerStrategy = async (
+  data: any[],
+  onProgress?: ProgressCallback
+): Promise<ProcessedData> => {
+  console.log(`Using Web Worker processing for ${data.length} rows`);
+  
+  return new Promise((resolve, reject) => {
+    const worker = new Worker(
+      new URL('../workers/csvProcessor.worker.ts', import.meta.url),
+      { type: 'module' }
+    );
+
+    worker.onmessage = (event) => {
+      const { type, payload, progress, error } = event.data;
+
+      switch (type) {
+        case 'PROGRESS':
+          if (onProgress && progress !== undefined) {
+            const adjustedProgress = 30 + (progress * 0.7);
+            onProgress(adjustedProgress);
+          }
+          break;
+
+        case 'SUCCESS':
+          worker.terminate();
+          resolve(payload);
+          break;
+
+        case 'ERROR':
+          worker.terminate();
+          reject(new Error(error || 'Worker processing failed'));
+          break;
+      }
+    };
+
+    worker.onerror = (error) => {
+      worker.terminate();
+      reject(new Error(`Worker error: ${error.message}`));
+    };
+
+    worker.postMessage({
+      type: 'PROCESS_CSV',
+      payload: data
+    });
+  });
+};
+
+// Finalize processing after data cleaning
+const finalizeProcessing = async (
+  cleanedData: any[],
+  onProgress?: ProgressCallback,
+  startProgress: number = 85
+): Promise<ProcessedData> => {
+  // Aggregate sales by state
+  const salesByState = aggregateSalesByState(cleanedData);
+  if (onProgress) onProgress(startProgress + 5);
+  
+  // Determine nexus states
+  const nexusStates = determineNexusStates(salesByState);
+  if (onProgress) onProgress(startProgress + 10);
+  
+  // Calculate tax liabilities
+  const statesWithLiability = calculateTaxLiabilities(nexusStates);
+  if (onProgress) onProgress(startProgress + 12);
+  
+  // Determine priority states
+  const priorityStates = [...statesWithLiability]
+    .sort((a, b) => b.liability - a.liability)
+    .slice(0, 5);
+  
+  // Calculate total liability
+  const totalLiability = statesWithLiability.reduce(
+    (sum, state) => sum + state.liability, 
+    0
+  );
+  
+  // Determine data range
+  const allDates = cleanedData.map(row => new Date(row.date));
+  const startDate = new Date(Math.min(...allDates.map(d => d.getTime())));
+  const endDate = new Date(Math.max(...allDates.map(d => d.getTime())));
+
+  // Extract available years
+  const availableYears = [...new Set(cleanedData.map(row => row.date.substring(0, 4)))].sort();
+
+  // Format salesByState
+  const formattedSalesByState = Object.entries(salesByState).map(([stateCode, data]) => {
+    const thresholds = determineStateThresholds(stateCode);
+    const taxRate = getStateTaxRate(stateCode);
+    
+    const currentYear = new Date().getFullYear().toString();
+    const currentYearData = data.annualSales[currentYear] || {
+      totalRevenue: 0,
+      transactionCount: 0
+    };
+    
+    const revenueProximity = thresholds.revenue > 0 
+      ? Number(((currentYearData.totalRevenue / thresholds.revenue) * 100).toFixed(2))
+      : 0;
+    
+    const transactionProximity = thresholds.transactions 
+      ? Number(((currentYearData.transactionCount / thresholds.transactions) * 100).toFixed(2))
+      : 0;
+    
+    const thresholdProximity = Number(Math.max(revenueProximity, transactionProximity).toFixed(2));
+
+    return {
+      code: stateCode,
+      name: getStateName(stateCode),
+      totalRevenue: data.totalRevenue,
+      transactionCount: data.transactionCount,
+      monthlyRevenue: data.monthlyRevenue,
+      revenueThreshold: thresholds.revenue,
+      transactionThreshold: thresholds.transactions,
+      thresholdProximity,
+      taxRate: Number(taxRate.toFixed(2)),
+      annualData: {}
+    };
+  });
+
+  if (onProgress) onProgress(100);
+  
+  return {
+    nexusStates: statesWithLiability,
+    totalLiability,
+    priorityStates,
+    salesByState: formattedSalesByState,
+    dataRange: {
+      start: startDate.toISOString().split('T')[0],
+      end: endDate.toISOString().split('T')[0],
+    },
+    availableYears,
+  };
 };
 
 // Original processing function (kept for fallback and compatibility)
@@ -331,12 +491,8 @@ const normalizeDateString = (dateStr: string): string => {
 const readFileAsArrayBuffer = (file: File): Promise<ArrayBuffer> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = () => {
-      resolve(reader.result as ArrayBuffer);
-    };
-    reader.onerror = () => {
-      reject(new Error('Failed to read file'));
-    };
+    reader.onload = () => resolve(reader.result as ArrayBuffer);
+    reader.onerror = () => reject(new Error('Failed to read file'));
     reader.readAsArrayBuffer(file);
   });
 };
