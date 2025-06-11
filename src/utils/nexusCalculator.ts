@@ -8,6 +8,7 @@ interface NexusResult {
   preNexusRevenue: number;
   postNexusRevenue: number;
   nexusThresholdAmount: number;
+  nexusYear: string;
 }
 
 export const calculateNexus = (
@@ -27,7 +28,8 @@ export const calculateNexus = (
       thresholdType: 'revenue',
       preNexusRevenue: 0,
       postNexusRevenue: 0,
-      nexusThresholdAmount: 0
+      nexusThresholdAmount: 0,
+      nexusYear: ''
     };
   }
 
@@ -36,54 +38,74 @@ export const calculateNexus = (
     (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
   );
   
-  // Calculate running totals
-  let runningRevenue = 0;
-  let runningTransactions = 0;
+  // Group data by year and check each year independently
+  const yearlyData: { [year: string]: { revenue: number; transactions: number; firstDate: string } } = {};
+  
+  sortedData.forEach(month => {
+    const year = month.date.substring(0, 4);
+    if (!yearlyData[year]) {
+      yearlyData[year] = { revenue: 0, transactions: 0, firstDate: month.date };
+    }
+    yearlyData[year].revenue += month.revenue;
+    yearlyData[year].transactions += month.transactions;
+    if (month.date < yearlyData[year].firstDate) {
+      yearlyData[year].firstDate = month.date;
+    }
+  });
+  
+  // Check each year for nexus (NON-CUMULATIVE)
+  let earliestNexusYear: string | null = null;
   let nexusDate = '';
   let thresholdType: 'revenue' | 'transactions' = 'revenue';
-  let preNexusRevenue = 0;
-  let postNexusRevenue = 0;
   let nexusThresholdAmount = 0;
   
-  for (const month of sortedData) {
-    const monthRevenue = month.revenue;
-    const monthTransactions = month.transactions;
+  for (const [year, data] of Object.entries(yearlyData)) {
+    // Check if this year alone meets the threshold
+    const hasRevenueNexus = data.revenue >= revenueThreshold;
+    const hasTransactionNexus = transactionThreshold !== null && data.transactions >= transactionThreshold;
     
-    // Check if nexus is already established
-    if (!nexusDate) {
-      // Add to running totals
-      runningRevenue += monthRevenue;
-      runningTransactions += monthTransactions;
-      
-      // Check revenue threshold
-      if (runningRevenue >= revenueThreshold) {
-        nexusDate = month.date;
-        thresholdType = 'revenue';
-        nexusThresholdAmount = revenueThreshold;
-        preNexusRevenue = runningRevenue - monthRevenue; // Exclude the transaction that crossed threshold
-        postNexusRevenue = monthRevenue; // Only include amount after crossing threshold
-      } 
-      // Only check transaction threshold if it exists for this state
-      else if (transactionThreshold !== null && runningTransactions >= transactionThreshold) {
-        nexusDate = month.date;
-        thresholdType = 'transactions';
-        nexusThresholdAmount = transactionThreshold;
-        preNexusRevenue = runningRevenue - monthRevenue;
-        postNexusRevenue = monthRevenue;
+    if (hasRevenueNexus || hasTransactionNexus) {
+      if (!earliestNexusYear || year < earliestNexusYear) {
+        earliestNexusYear = year;
+        nexusDate = data.firstDate;
+        thresholdType = hasRevenueNexus ? 'revenue' : 'transactions';
+        nexusThresholdAmount = hasRevenueNexus ? revenueThreshold : (transactionThreshold || 0);
       }
+    }
+  }
+  
+  if (!earliestNexusYear) {
+    return {
+      hasNexus: false,
+      nexusDate: '',
+      thresholdType: 'revenue',
+      preNexusRevenue: totalRevenue,
+      postNexusRevenue: 0,
+      nexusThresholdAmount: revenueThreshold,
+      nexusYear: ''
+    };
+  }
+  
+  // Calculate pre and post nexus revenue
+  let preNexusRevenue = 0;
+  let postNexusRevenue = 0;
+  
+  for (const [year, data] of Object.entries(yearlyData)) {
+    if (year < earliestNexusYear) {
+      preNexusRevenue += data.revenue;
     } else {
-      // After nexus is established, all revenue is taxable
-      postNexusRevenue += monthRevenue;
+      postNexusRevenue += data.revenue;
     }
   }
   
   return {
-    hasNexus: nexusDate !== '',
+    hasNexus: true,
     nexusDate,
     thresholdType,
     preNexusRevenue,
     postNexusRevenue,
-    nexusThresholdAmount
+    nexusThresholdAmount,
+    nexusYear: earliestNexusYear
   };
 };
 
@@ -97,17 +119,17 @@ export const isWithinNexusPeriod = (date: string, nexusDate: string): boolean =>
   return checkDate >= startDate;
 };
 
-// Calculate remaining time until nexus is established
+// Calculate remaining time until nexus is established for CURRENT YEAR
 export const calculateRemainingToNexus = (
   stateCode: string,
-  currentRevenue: number,
-  currentTransactions: number
+  currentYearRevenue: number,
+  currentYearTransactions: number
 ): { remainingRevenue: number; remainingTransactions: number | null } => {
   const { revenue: revenueThreshold, transactions: transactionThreshold } = determineStateThresholds(stateCode);
   
-  const remainingRevenue = Math.max(0, revenueThreshold - currentRevenue);
+  const remainingRevenue = Math.max(0, revenueThreshold - currentYearRevenue);
   const remainingTransactions = transactionThreshold !== null 
-    ? Math.max(0, transactionThreshold - currentTransactions)
+    ? Math.max(0, transactionThreshold - currentYearTransactions)
     : null;
   
   return {
