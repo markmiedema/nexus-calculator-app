@@ -1,9 +1,9 @@
 import React from 'react';
-import { ColumnMappingPreview } from '../utils/dataValidation';
+import { ColumnMappingPreviewData } from '../utils/dataValidation';
 import { CheckCircle, AlertCircle, XCircle, Download, Info } from 'lucide-react';
 
 interface ColumnMappingPreviewProps {
-  preview: ColumnMappingPreview;
+  preview: ColumnMappingPreviewData;
   onDownloadTemplate: () => void;
   onProceed: () => void;
   onCancel: () => void;

@@ -10,7 +10,7 @@ export interface ValidationResult {
   suggestions: string[];
 }
 
-export interface ColumnMappingPreview {
+export interface ColumnMappingPreviewData {
   detectedMappings: Array<{
     standardColumn: string;
     detectedHeader: string | null;
@@ -229,7 +229,7 @@ const validateDataQuality = (data: CSVRow[], detectionResult: DetectionResult): 
 };
 
 // Generate column mapping preview for user interface
-export const generateColumnMappingPreview = (detectionResult: DetectionResult): ColumnMappingPreview => {
+export const generateColumnMappingPreview = (detectionResult: DetectionResult): ColumnMappingPreviewData => {
   const { mapping, confidence } = detectionResult;
   const requiredColumns = ['date', 'state', 'sale_amount'];
   
