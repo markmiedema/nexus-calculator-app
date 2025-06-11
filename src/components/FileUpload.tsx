@@ -1,6 +1,10 @@
 import React, { useRef, useState } from 'react';
-import { Upload, AlertCircle, FileText, CheckCircle, X } from 'lucide-react';
+import { Upload, AlertCircle, FileText, CheckCircle, X, Download, Info } from 'lucide-react';
 import ProgressIndicator from './ProgressIndicator';
+import ColumnMappingPreview from './ColumnMappingPreview';
+import { validateCSVWithSmartDetection, generateColumnMappingPreview, downloadCSVTemplate, ValidationResult } from '../utils/dataValidation';
+import { detectColumns } from '../utils/columnDetection';
+import * as XLSX from 'xlsx';
 
 interface FileUploadProps {
   onFileUpload: (file: File) => void;
@@ -12,6 +16,8 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload, isProcessing, err
   const [isDragging, setIsDragging] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
+  const [showPreview, setShowPreview] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
@@ -30,9 +36,16 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload, isProcessing, err
     
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       const file = e.dataTransfer.files[0];
-      if (file.type === 'text/csv' || file.name.endsWith('.csv')) {
+      if (isValidFileType(file)) {
         setSelectedFile(file);
-        handleProcessFile(file);
+        validateFile(file);
+      } else {
+        setValidationResult({
+          isValid: false,
+          errors: ['Invalid file type. Please upload a CSV or Excel file.'],
+          warnings: [],
+          suggestions: ['Supported formats: .csv, .xlsx, .xls']
+        });
       }
     }
   };
@@ -41,7 +54,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload, isProcessing, err
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       setSelectedFile(file);
-      handleProcessFile(file);
+      validateFile(file);
     }
   };
 
@@ -51,29 +64,142 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload, isProcessing, err
     }
   };
 
-  const handleProcessFile = async (file: File) => {
+  const isValidFileType = (file: File): boolean => {
+    const validTypes = [
+      'text/csv',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    ];
+    return validTypes.includes(file.type) || 
+           file.name.endsWith('.csv') || 
+           file.name.endsWith('.xlsx') || 
+           file.name.endsWith('.xls');
+  };
+
+  const validateFile = async (file: File) => {
     try {
-      setUploadProgress(0);
-      await onFileUpload(file);
-    } catch (error) {
-      console.error('Error processing file:', error);
+      setUploadProgress(10);
+      
+      // Read file
+      const buffer = await readFileAsArrayBuffer(file);
+      setUploadProgress(30);
+      
+      // Parse file
+      let data: any[] = [];
+      if (file.name.endsWith('.csv')) {
+        const text = new TextDecoder().decode(buffer);
+        data = parseCSV(text);
+      } else {
+        const workbook = XLSX.read(buffer, { type: 'array' });
+        workbook.SheetNames.forEach(sheetName => {
+          const worksheet = workbook.Sheets[sheetName];
+          const sheetData = XLSX.utils.sheet_to_json(worksheet, { raw: false });
+          data.push(...sheetData);
+        });
+      }
+      
+      setUploadProgress(60);
+      
+      // Validate with smart detection
+      const result = validateCSVWithSmartDetection(data);
+      setValidationResult(result);
+      
+      if (result.isValid) {
+        setShowPreview(true);
+      }
+      
+      setUploadProgress(100);
+    } catch (err) {
+      setValidationResult({
+        isValid: false,
+        errors: [err instanceof Error ? err.message : 'Failed to process file'],
+        warnings: [],
+        suggestions: ['Please check your file format and try again']
+      });
     }
   };
+
+  const handleProceedWithAnalysis = () => {
+    if (selectedFile) {
+      setShowPreview(false);
+      onFileUpload(selectedFile);
+    }
+  };
+
+  const handleCancelPreview = () => {
+    setShowPreview(false);
+    setSelectedFile(null);
+    setValidationResult(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const handleDownloadTemplate = () => {
+    downloadCSVTemplate();
+  };
+
+  const readFileAsArrayBuffer = (file: File): Promise<ArrayBuffer> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as ArrayBuffer);
+      reader.onerror = () => reject(new Error('Failed to read file'));
+      reader.readAsArrayBuffer(file);
+    });
+  };
+
+  const parseCSV = (text: string): any[] => {
+    const lines = text.split('\n');
+    const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
+    
+    return lines.slice(1).filter(line => line.trim()).map(line => {
+      const values = line.split(',').map(v => v.trim().replace(/"/g, ''));
+      const row: Record<string, any> = {};
+      
+      headers.forEach((header, i) => {
+        row[header] = values[i] || '';
+      });
+      
+      return row;
+    });
+  };
+
+  // Show column mapping preview
+  if (showPreview && validationResult?.detectionResult) {
+    const preview = generateColumnMappingPreview(validationResult.detectionResult);
+    return (
+      <ColumnMappingPreview
+        preview={preview}
+        onDownloadTemplate={handleDownloadTemplate}
+        onProceed={handleProceedWithAnalysis}
+        onCancel={handleCancelPreview}
+      />
+    );
+  }
 
   return (
     <div className="bg-white rounded-lg shadow-md p-6">
       <div className="mb-6">
-        <h2 className="text-xl font-semibold text-gray-800 mb-2">Upload Sales Data</h2>
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="text-xl font-semibold text-gray-800">Upload Sales Data</h2>
+          <button
+            onClick={handleDownloadTemplate}
+            className="flex items-center px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+          >
+            <Download className="h-4 w-4 mr-1" />
+            Download Template
+          </button>
+        </div>
         <p className="text-gray-600 text-sm">
-          Upload a CSV file containing your sales data to analyze nexus obligations.
-          The file should include columns for date, state, and sale_amount.
+          Upload a CSV or Excel file containing your sales data. Our smart detection will automatically 
+          identify the correct columns for analysis.
         </p>
       </div>
 
       <div
-        className={`border-2 border-dashed rounded-lg p-8 text-center ${
+        className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors duration-200 ${
           isDragging ? 'border-blue-500 bg-blue-50' : 'border-gray-300'
-        } transition-colors duration-200`}
+        }`}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
@@ -82,7 +208,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload, isProcessing, err
           type="file"
           ref={fileInputRef}
           className="hidden"
-          accept=".csv"
+          accept=".csv,.xlsx,.xls"
           onChange={handleFileSelect}
         />
         
@@ -90,7 +216,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload, isProcessing, err
           <div className="flex flex-col items-center justify-center">
             <Upload className="h-12 w-12 text-blue-500 mb-4" />
             <h3 className="text-lg font-medium text-gray-700 mb-2">
-              Drag & Drop your CSV file here
+              Drag & Drop your file here
             </h3>
             <p className="text-gray-500 mb-4">or</p>
             <button
@@ -99,60 +225,116 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload, isProcessing, err
             >
               Browse Files
             </button>
+            <p className="text-xs text-gray-500 mt-3">
+              Supports CSV, Excel (.xlsx, .xls) files up to 50MB
+            </p>
           </div>
         ) : (
-          <div className="flex items-center justify-between p-4 bg-gray-50 rounded-md">
-            <div className="flex items-center">
-              <FileText className="h-6 w-6 text-blue-500 mr-3" />
-              <div>
-                <p className="font-medium text-gray-800">{selectedFile.name}</p>
-                <p className="text-sm text-gray-500">
-                  {(selectedFile.size / 1024).toFixed(2)} KB
-                </p>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-md">
+              <div className="flex items-center">
+                <FileText className="h-6 w-6 text-blue-500 mr-3" />
+                <div>
+                  <p className="font-medium text-gray-800">{selectedFile.name}</p>
+                  <p className="text-sm text-gray-500">
+                    {(selectedFile.size / 1024).toFixed(2)} KB
+                  </p>
+                </div>
               </div>
-            </div>
-            <div className="flex items-center space-x-3">
               <button
-                onClick={() => setSelectedFile(null)}
+                onClick={() => {
+                  setSelectedFile(null);
+                  setValidationResult(null);
+                  if (fileInputRef.current) fileInputRef.current.value = '';
+                }}
                 className="text-gray-500 hover:text-gray-700"
               >
                 <X className="h-5 w-5" />
               </button>
-              <button
-                onClick={() => handleProcessFile(selectedFile)}
-                disabled={isProcessing}
-                className={`px-4 py-2 rounded-md text-white flex items-center ${
-                  isProcessing 
-                    ? 'bg-gray-400 cursor-not-allowed' 
-                    : 'bg-green-600 hover:bg-green-700'
-                } transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50`}
-              >
-                {isProcessing ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>
-                    Processing...
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle className="h-4 w-4 mr-2" />
-                    Analyze Data
-                  </>
-                )}
-              </button>
             </div>
+
+            {uploadProgress > 0 && uploadProgress < 100 && (
+              <ProgressIndicator
+                progress={uploadProgress}
+                message="Validating file structure..."
+              />
+            )}
           </div>
         )}
       </div>
 
-      {isProcessing && (
-        <div className="mt-6">
-          <ProgressIndicator
-            progress={uploadProgress}
-            message="Processing your sales data..."
-          />
+      {/* Validation Results */}
+      {validationResult && (
+        <div className="mt-6 space-y-4">
+          {/* Errors */}
+          {validationResult.errors.length > 0 && (
+            <div className="p-4 bg-red-50 border border-red-200 rounded-md">
+              <div className="flex items-start">
+                <AlertCircle className="h-5 w-5 text-red-500 mt-0.5 flex-shrink-0 mr-3" />
+                <div>
+                  <h3 className="text-red-800 font-medium">Validation Errors</h3>
+                  <ul className="mt-2 text-sm text-red-700 space-y-1">
+                    {validationResult.errors.map((error, index) => (
+                      <li key={index}>• {error}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Warnings */}
+          {validationResult.warnings.length > 0 && (
+            <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-md">
+              <div className="flex items-start">
+                <AlertCircle className="h-5 w-5 text-yellow-500 mt-0.5 flex-shrink-0 mr-3" />
+                <div>
+                  <h3 className="text-yellow-800 font-medium">Warnings</h3>
+                  <ul className="mt-2 text-sm text-yellow-700 space-y-1">
+                    {validationResult.warnings.map((warning, index) => (
+                      <li key={index}>• {warning}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Success */}
+          {validationResult.isValid && (
+            <div className="p-4 bg-green-50 border border-green-200 rounded-md">
+              <div className="flex items-start">
+                <CheckCircle className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0 mr-3" />
+                <div>
+                  <h3 className="text-green-800 font-medium">File Validated Successfully</h3>
+                  <p className="mt-1 text-sm text-green-700">
+                    All required columns detected. Click "Review Mappings" to proceed.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Suggestions */}
+          {validationResult.suggestions.length > 0 && (
+            <div className="p-4 bg-blue-50 border border-blue-200 rounded-md">
+              <div className="flex items-start">
+                <Info className="h-5 w-5 text-blue-500 mt-0.5 flex-shrink-0 mr-3" />
+                <div>
+                  <h3 className="text-blue-800 font-medium">Suggestions</h3>
+                  <ul className="mt-2 text-sm text-blue-700 space-y-1">
+                    {validationResult.suggestions.map((suggestion, index) => (
+                      <li key={index}>• {suggestion}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
+      {/* Processing Error */}
       {error && (
         <div className="mt-4 p-4 bg-red-50 text-red-700 rounded-md flex items-start space-x-3">
           <AlertCircle className="h-5 w-5 text-red-500 mt-0.5 flex-shrink-0" />
@@ -163,15 +345,32 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload, isProcessing, err
         </div>
       )}
 
+      {/* Format Requirements */}
       <div className="mt-6 border-t border-gray-200 pt-4">
-        <h3 className="text-sm font-medium text-gray-700 mb-2">CSV Format Requirements:</h3>
-        <ul className="text-sm text-gray-600 space-y-1 list-disc pl-5">
-          <li>Required columns: date (YYYY-MM-DD), state (2-letter code), sale_amount (numeric)</li>
-          <li>Optional columns: transaction_count, customer_address</li>
-          <li>File can contain data for 1-4 years</li>
-          <li>CSV must include a header row with column names</li>
-          <li>Maximum file size: 50MB</li>
-        </ul>
+        <h3 className="text-sm font-medium text-gray-700 mb-3">Smart Column Detection</h3>
+        <div className="grid md:grid-cols-2 gap-4 text-sm text-gray-600">
+          <div>
+            <h4 className="font-medium text-gray-700 mb-2">Required Columns (auto-detected):</h4>
+            <ul className="space-y-1 list-disc pl-5">
+              <li><strong>Date:</strong> transaction_date, sale_date, order_date, etc.</li>
+              <li><strong>State:</strong> state, state_code, ship_to_state, etc.</li>
+              <li><strong>Amount:</strong> sale_amount, total, revenue, price, etc.</li>
+            </ul>
+          </div>
+          <div>
+            <h4 className="font-medium text-gray-700 mb-2">Optional Columns:</h4>
+            <ul className="space-y-1 list-disc pl-5">
+              <li><strong>Quantity:</strong> transaction_count, qty, units, etc.</li>
+              <li><strong>Address:</strong> customer_address, billing_address, etc.</li>
+            </ul>
+          </div>
+        </div>
+        <div className="mt-3 p-3 bg-blue-50 rounded-md">
+          <p className="text-sm text-blue-700">
+            <strong>Smart Detection:</strong> Our system automatically identifies columns using fuzzy matching, 
+            supporting various naming conventions and formats. No need to rename your columns!
+          </p>
+        </div>
       </div>
     </div>
   );
