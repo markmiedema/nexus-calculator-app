@@ -82,13 +82,13 @@ export const COLUMN_MAPPINGS: ColumnMapping = {
     'line_total',
     'line total',
     'extended_price',
-    'extended price'
+    'extended price',
+    'sales amount ($)'
   ],
   transaction_count: [
     'transaction_count',
     'transaction count',
     'transactions',
-    'count',
     'quantity',
     'qty',
     'units',
@@ -103,7 +103,9 @@ export const COLUMN_MAPPINGS: ColumnMapping = {
     'sales count',
     'number_of_transactions',
     'num_transactions',
-    'trans_count'
+    'trans_count',
+    'item_count',
+    'product_count'
   ],
   city: [
     'city',
@@ -187,6 +189,14 @@ export const calculateSimilarity = (header: string, target: string): number => {
     return 95;
   }
   
+  // Special handling for county vs count disambiguation
+  if (normalizedHeader === 'county' && normalizedTarget === 'count') {
+    return 30; // Low score to prevent confusion
+  }
+  if (normalizedHeader === 'count' && normalizedTarget === 'county') {
+    return 30; // Low score to prevent confusion
+  }
+  
   // Check if header contains target as whole word
   const headerWords = normalizedHeader.split(/[_\-\s]+/);
   const targetWords = normalizedTarget.split(/[_\-\s]+/);
@@ -215,15 +225,27 @@ export const calculateSimilarity = (header: string, target: string): number => {
   return (matchingChars / maxLength) * 100;
 };
 
-// Detect columns with confidence scoring
+// Enhanced detection with priority-based matching
 export const detectColumns = (rawHeaders: string[]): DetectionResult => {
   const mapping: { [standardName: string]: string | null } = {};
   const confidence: { [standardName: string]: number } = {};
   const suggestions: { [standardName: string]: string[] } = {};
   const usedHeaders = new Set<string>();
   
-  // For each standard column, find the best match
-  for (const [standardName, variations] of Object.entries(COLUMN_MAPPINGS)) {
+  // Define priority order for detection (most specific first)
+  const detectionOrder = [
+    'date',
+    'state', 
+    'sale_amount',
+    'county',        // Detect county before transaction_count
+    'city',
+    'zip_code',
+    'transaction_count'  // Detect transaction_count last
+  ];
+  
+  // For each standard column in priority order, find the best match
+  for (const standardName of detectionOrder) {
+    const variations = COLUMN_MAPPINGS[standardName];
     let bestMatch: string | null = null;
     let bestScore = 0;
     const candidateScores: Array<{ header: string; score: number }> = [];
@@ -238,6 +260,15 @@ export const detectColumns = (rawHeaders: string[]): DetectionResult => {
       for (const variation of variations) {
         const score = calculateSimilarity(rawHeader, variation);
         maxScore = Math.max(maxScore, score);
+      }
+      
+      // Apply special rules for disambiguation
+      if (standardName === 'county' && rawHeader.toLowerCase() === 'county') {
+        maxScore = 100; // Perfect match for county
+      }
+      
+      if (standardName === 'transaction_count' && rawHeader.toLowerCase() === 'county') {
+        maxScore = 0; // Never match county to transaction_count
       }
       
       candidateScores.push({ header: rawHeader, score: maxScore });
