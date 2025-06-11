@@ -34,10 +34,35 @@ describe('columnDetection', () => {
       expect(calculateSimilarity('xyz', 'date')).toBeLessThan(30);
     });
 
-    it('should not confuse county with transaction count', () => {
+    it('should NOT confuse county with transaction count', () => {
       const countyScore = calculateSimilarity('county', 'county');
       const countScore = calculateSimilarity('county', 'count');
+      
+      expect(countyScore).toBe(100); // Exact match
+      expect(countScore).toBeLessThan(30); // Should be very low due to word boundary logic
       expect(countyScore).toBeGreaterThan(countScore);
+    });
+
+    it('should properly distinguish count vs county in various formats', () => {
+      // County variations should match county well
+      expect(calculateSimilarity('customer_county', 'county')).toBeGreaterThan(80);
+      expect(calculateSimilarity('billing_county', 'county')).toBeGreaterThan(80);
+      
+      // But county should not match count variations well
+      expect(calculateSimilarity('county', 'count')).toBeLessThan(30);
+      expect(calculateSimilarity('county', 'transaction_count')).toBeLessThan(50);
+      
+      // Count variations should match count well
+      expect(calculateSimilarity('transaction_count', 'count')).toBeGreaterThan(70);
+      expect(calculateSimilarity('item_count', 'count')).toBeGreaterThan(70);
+    });
+
+    it('should handle word boundary matches correctly', () => {
+      // Word boundary matches should score higher than substring matches
+      const wordBoundaryScore = calculateSimilarity('sale_amount', 'amount');
+      const substringScore = calculateSimilarity('advancement', 'amount');
+      
+      expect(wordBoundaryScore).toBeGreaterThan(substringScore);
     });
   });
 
@@ -77,6 +102,26 @@ describe('columnDetection', () => {
       
       expect(result.mapping.county).toBe('county');
       expect(result.mapping.transaction_count).toBe('count');
+      
+      // Verify confidence scores
+      expect(result.confidence.county).toBe(100); // Exact match
+      expect(result.confidence.transaction_count).toBeGreaterThan(80); // Good match for count
+    });
+
+    it('should handle the problematic case: county should not be detected as transaction_count', () => {
+      const headers = ['date', 'state', 'sale_amount', 'county'];
+      const result = detectColumns(headers);
+      
+      expect(result.mapping.county).toBe('county');
+      expect(result.mapping.transaction_count).toBeNull(); // Should not map county to transaction_count
+    });
+
+    it('should prioritize exact matches over partial matches', () => {
+      const headers = ['date', 'state', 'sale_amount', 'county', 'transaction_count'];
+      const result = detectColumns(headers);
+      
+      expect(result.mapping.county).toBe('county');
+      expect(result.mapping.transaction_count).toBe('transaction_count');
     });
 
     it('should not map headers with low confidence', () => {
@@ -116,6 +161,29 @@ describe('columnDetection', () => {
       const mappedHeaders = Object.values(result.mapping).filter(h => h !== null);
       const uniqueHeaders = new Set(mappedHeaders);
       expect(mappedHeaders.length).toBe(uniqueHeaders.size);
+    });
+
+    it('should handle geographic columns correctly', () => {
+      const headers = ['date', 'state', 'amount', 'customer_city', 'billing_county', 'postal_code'];
+      const result = detectColumns(headers);
+      
+      expect(result.mapping.city).toBe('customer_city');
+      expect(result.mapping.county).toBe('billing_county');
+      expect(result.mapping.zip_code).toBe('postal_code');
+    });
+
+    it('should handle parish as county variation', () => {
+      const headers = ['date', 'state', 'amount', 'parish'];
+      const result = detectColumns(headers);
+      
+      expect(result.mapping.county).toBe('parish');
+    });
+
+    it('should handle borough as county variation', () => {
+      const headers = ['date', 'state', 'amount', 'borough'];
+      const result = detectColumns(headers);
+      
+      expect(result.mapping.county).toBe('borough');
     });
   });
 
