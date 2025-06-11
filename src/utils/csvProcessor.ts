@@ -6,72 +6,105 @@ import { determineStateThresholds } from '../constants/stateThresholds';
 import { getStateTaxRate } from '../constants/taxRates';
 import { detectColumns, transformDataWithMapping, validateDetection, generateDetectionReport } from './columnDetection';
 import { cleanDataset, generateCleaningReport } from './dataCleaning';
+import { useWebWorker } from '../hooks/useWebWorker';
+import { processCSVDataFallback, isWebWorkerSupported } from './workerFallback';
 import * as XLSX from 'xlsx';
 
 // Progress callback type
 type ProgressCallback = (progress: number) => void;
 
-// Batch processing for large datasets
-const processBatch = <T>(
-  items: T[],
-  batchSize: number,
-  processor: (batch: T[]) => void,
-  onProgress?: ProgressCallback
-): Promise<void> => {
-  return new Promise((resolve) => {
-    let index = 0;
-    
-    const processNextBatch = () => {
-      const batch = items.slice(index, index + batchSize);
-      if (batch.length === 0) {
-        resolve();
-        return;
-      }
-      
-      processor(batch);
-      index += batchSize;
-      
-      if (onProgress) {
-        onProgress(Math.min(100, Math.round((index / items.length) * 100)));
-      }
-      
-      // Use setTimeout to prevent blocking the UI
-      setTimeout(processNextBatch, 0);
-    };
-    
-    processNextBatch();
-  });
-};
-
-const formatExcelDate = (serial: number): string => {
-  // Excel dates are number of days since 1900-01-01
-  // Convert to JavaScript Date and then to YYYY-MM-DD
-  const date = new Date(Math.round((serial - 25569) * 86400 * 1000));
-  return date.toISOString().split('T')[0];
-};
-
-const normalizeDateString = (dateStr: string): string => {
-  // Handle various date formats
-  if (typeof dateStr === 'number') {
-    return formatExcelDate(dateStr);
-  }
-
-  // Handle MM/DD/YY format
-  const mmddyyRegex = /^(\d{1,2})\/(\d{1,2})\/(\d{2})$/;
-  if (mmddyyRegex.test(dateStr)) {
-    const [, month, day, year] = mmddyyRegex.exec(dateStr)!;
-    const fullYear = parseInt(year) < 50 ? `20${year}` : `19${year}`;
-    return `${fullYear}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-  }
-
-  const date = new Date(dateStr);
-  if (isNaN(date.getTime())) {
-    throw new Error(`Invalid date format. Expected YYYY-MM-DD, got '${dateStr}'`);
-  }
-  return date.toISOString().split('T')[0];
-};
-
+// Enhanced CSV processor with Web Worker support
 export const processCSVData = async (
+  file: File,
+  onProgress?: ProgressCallback
+): Promise<ProcessedData> => {
+  try {
+    // Read and parse the file first
+    const buffer = await readFileAsArrayBuffer(file);
+    if (onProgress) onProgress(10);
+    
+    // Parse workbook
+    const workbook = XLSX.read(buffer, { type: 'array' });
+    if (onProgress) onProgress(20);
+    
+    // Combine data from all worksheets
+    const combinedData: any[] = [];
+    workbook.SheetNames.forEach(sheetName => {
+      const worksheet = workbook.Sheets[sheetName];
+      const sheetData = XLSX.utils.sheet_to_json(worksheet, { raw: false });
+      combinedData.push(...sheetData);
+    });
+    
+    if (combinedData.length === 0) {
+      throw new Error('CSV file is empty');
+    }
+    
+    if (onProgress) onProgress(30);
+
+    // Check if Web Workers are supported
+    if (isWebWorkerSupported()) {
+      // Use Web Worker for processing
+      return new Promise((resolve, reject) => {
+        const worker = new Worker(
+          new URL('../workers/csvProcessor.worker.ts', import.meta.url),
+          { type: 'module' }
+        );
+
+        worker.onmessage = (event) => {
+          const { type, payload, progress, error } = event.data;
+
+          switch (type) {
+            case 'PROGRESS':
+              if (onProgress && progress !== undefined) {
+                // Adjust progress to account for file reading (30% already done)
+                const adjustedProgress = 30 + (progress * 0.7);
+                onProgress(adjustedProgress);
+              }
+              break;
+
+            case 'SUCCESS':
+              worker.terminate();
+              resolve(payload);
+              break;
+
+            case 'ERROR':
+              worker.terminate();
+              reject(new Error(error || 'Worker processing failed'));
+              break;
+          }
+        };
+
+        worker.onerror = (error) => {
+          worker.terminate();
+          reject(new Error(`Worker error: ${error.message}`));
+        };
+
+        // Send data to worker
+        worker.postMessage({
+          type: 'PROCESS_CSV',
+          payload: combinedData
+        });
+      });
+    } else {
+      // Fallback to main thread processing
+      if (onProgress) onProgress(35);
+      return await processCSVDataFallback(combinedData, (progress) => {
+        if (onProgress) {
+          // Adjust progress to account for file reading (35% already done)
+          const adjustedProgress = 35 + (progress * 0.65);
+          onProgress(adjustedProgress);
+        }
+      });
+    }
+
+  } catch (error) {
+    console.error('Error processing file:', error);
+    throw new Error(`Failed to process file: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+};
+
+// Original processing function (kept for fallback and compatibility)
+export const processCSVDataOriginal = async (
   file: File,
   onProgress?: ProgressCallback
 ): Promise<ProcessedData> => {
@@ -233,6 +266,66 @@ export const processCSVData = async (
     console.error('Error processing file:', error);
     throw new Error(`Failed to process file: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
+};
+
+// Batch processing for large datasets
+const processBatch = <T>(
+  items: T[],
+  batchSize: number,
+  processor: (batch: T[]) => void,
+  onProgress?: ProgressCallback
+): Promise<void> => {
+  return new Promise((resolve) => {
+    let index = 0;
+    
+    const processNextBatch = () => {
+      const batch = items.slice(index, index + batchSize);
+      if (batch.length === 0) {
+        resolve();
+        return;
+      }
+      
+      processor(batch);
+      index += batchSize;
+      
+      if (onProgress) {
+        onProgress(Math.min(100, Math.round((index / items.length) * 100)));
+      }
+      
+      // Use setTimeout to prevent blocking the UI
+      setTimeout(processNextBatch, 0);
+    };
+    
+    processNextBatch();
+  });
+};
+
+const formatExcelDate = (serial: number): string => {
+  // Excel dates are number of days since 1900-01-01
+  // Convert to JavaScript Date and then to YYYY-MM-DD
+  const date = new Date(Math.round((serial - 25569) * 86400 * 1000));
+  return date.toISOString().split('T')[0];
+};
+
+const normalizeDateString = (dateStr: string): string => {
+  // Handle various date formats
+  if (typeof dateStr === 'number') {
+    return formatExcelDate(dateStr);
+  }
+
+  // Handle MM/DD/YY format
+  const mmddyyRegex = /^(\d{1,2})\/(\d{1,2})\/(\d{2})$/;
+  if (mmddyyRegex.test(dateStr)) {
+    const [, month, day, year] = mmddyyRegex.exec(dateStr)!;
+    const fullYear = parseInt(year) < 50 ? `20${year}` : `19${year}`;
+    return `${fullYear}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+  }
+
+  const date = new Date(dateStr);
+  if (isNaN(date.getTime())) {
+    throw new Error(`Invalid date format. Expected YYYY-MM-DD, got '${dateStr}'`);
+  }
+  return date.toISOString().split('T')[0];
 };
 
 const readFileAsArrayBuffer = (file: File): Promise<ArrayBuffer> => {
