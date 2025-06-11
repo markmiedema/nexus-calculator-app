@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import Header from './components/Header';
-import EnhancedFileUpload from './components/EnhancedFileUpload';
+import FileUpload from './components/FileUpload';
 import Dashboard from './components/Dashboard';
 import { ProcessedData } from './types';
 import { processCSVData } from './utils/csvProcessor';
@@ -9,34 +9,16 @@ import { YearSelectionProvider } from './context/YearSelectionContext';
 import { ProgressProvider } from './context/ProgressContext';
 import YearToggleBar from './components/YearToggleBar';
 import EnhancedProgressIndicator from './components/EnhancedProgressIndicator';
-import { useMemoryMonitor } from './hooks/useMemoryMonitor';
 
 function App() {
   const [processedData, setProcessedData] = useState<ProcessedData | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Memory monitoring
-  const { memoryStats, triggerGC } = useMemoryMonitor({
-    onWarning: (stats) => {
-      console.warn('Memory warning in App:', stats);
-    },
-    onCritical: (stats) => {
-      console.error('Critical memory usage in App:', stats);
-      // Auto-trigger GC on critical memory
-      triggerGC();
-    }
-  });
-
   const handleFileUpload = async (file: File) => {
     try {
       setIsProcessing(true);
       setError(null);
-      
-      // Check memory before processing
-      if (memoryStats.isCritical) {
-        throw new Error('Memory usage is critically high. Please refresh the page and try again.');
-      }
       
       // Process the CSV file
       const data = await processCSVData(file);
@@ -46,8 +28,6 @@ function App() {
       setProcessedData(null);
     } finally {
       setIsProcessing(false);
-      // Trigger GC after processing to clean up
-      setTimeout(() => triggerGC(), 1000);
     }
   };
 
@@ -57,12 +37,12 @@ function App() {
         <Header />
         <main className="flex-grow container mx-auto px-4 py-8">
           {!processedData ? (
-            <div className="max-w-4xl mx-auto">
+            <div className="max-w-3xl mx-auto">
               <div className="mb-8 text-center">
                 <h1 className="text-3xl font-bold text-gray-800 mb-4">SALT Nexus Calculator</h1>
                 <p className="text-gray-600 max-w-2xl mx-auto">
                   Upload your sales data to analyze State and Local Tax (SALT) nexus obligations and 
-                  generate comprehensive compliance reports with intelligent memory management.
+                  generate comprehensive compliance reports.
                 </p>
               </div>
               
@@ -76,7 +56,7 @@ function App() {
                 </div>
               )}
               
-              <EnhancedFileUpload 
+              <FileUpload 
                 onFileUpload={handleFileUpload} 
                 isProcessing={isProcessing}
                 error={error}
