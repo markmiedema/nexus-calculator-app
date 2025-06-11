@@ -37,23 +37,29 @@ describe('columnDetection', () => {
 
   describe('detectColumns', () => {
     it('should detect standard column variations', () => {
-      const headers = ['Transaction Date', 'State Code', 'Total Amount', 'Qty'];
+      const headers = ['Transaction Date', 'State Code', 'Total Amount', 'Qty', 'Customer City', 'Zip Code'];
       const result = detectColumns(headers);
       
       expect(result.mapping.date).toBe('Transaction Date');
       expect(result.mapping.state).toBe('State Code');
       expect(result.mapping.sale_amount).toBe('Total Amount');
       expect(result.mapping.transaction_count).toBe('Qty');
+      expect(result.mapping.city).toBe('Customer City');
+      expect(result.mapping.zip_code).toBe('Zip Code');
     });
 
     it('should handle exact matches with high confidence', () => {
-      const headers = ['date', 'state', 'sale_amount', 'transaction_count'];
+      const headers = ['date', 'state', 'sale_amount', 'transaction_count', 'city', 'zip_code'];
       const result = detectColumns(headers);
       
       expect(result.mapping.date).toBe('date');
       expect(result.confidence.date).toBe(100);
       expect(result.mapping.state).toBe('state');
       expect(result.confidence.state).toBe(100);
+      expect(result.mapping.city).toBe('city');
+      expect(result.confidence.city).toBe(100);
+      expect(result.mapping.zip_code).toBe('zip_code');
+      expect(result.confidence.zip_code).toBe(100);
     });
 
     it('should not map headers with low confidence', () => {
@@ -63,14 +69,17 @@ describe('columnDetection', () => {
       expect(result.mapping.date).toBeNull();
       expect(result.mapping.state).toBeNull();
       expect(result.mapping.sale_amount).toBeNull();
+      expect(result.mapping.city).toBeNull();
+      expect(result.mapping.zip_code).toBeNull();
     });
 
     it('should provide suggestions for unmapped columns', () => {
-      const headers = ['Transaction Date', 'Unknown Column', 'Revenue'];
+      const headers = ['Transaction Date', 'Unknown Column', 'Revenue', 'Customer City'];
       const result = detectColumns(headers);
       
       expect(result.suggestions.date).toContain('Transaction Date');
       expect(result.suggestions.sale_amount).toContain('Revenue');
+      expect(result.suggestions.city).toContain('Customer City');
     });
 
     it('should identify unmapped headers', () => {
@@ -99,7 +108,8 @@ describe('columnDetection', () => {
           state: 'State',
           sale_amount: 'Amount',
           transaction_count: null,
-          customer_address: null
+          city: null,
+          zip_code: null
         },
         confidence: {},
         unmappedHeaders: [],
@@ -118,7 +128,8 @@ describe('columnDetection', () => {
           state: 'State',
           sale_amount: 'Amount',
           transaction_count: null,
-          customer_address: null
+          city: null,
+          zip_code: null
         },
         confidence: {},
         unmappedHeaders: [],
@@ -134,8 +145,8 @@ describe('columnDetection', () => {
   describe('transformDataWithMapping', () => {
     it('should transform data using column mapping', () => {
       const data = [
-        { 'Transaction Date': '2024-01-01', 'State Code': 'CA', 'Total': '1000' },
-        { 'Transaction Date': '2024-01-02', 'State Code': 'NY', 'Total': '2000' }
+        { 'Transaction Date': '2024-01-01', 'State Code': 'CA', 'Total': '1000', 'Customer City': 'Los Angeles', 'Zip': '90210' },
+        { 'Transaction Date': '2024-01-02', 'State Code': 'NY', 'Total': '2000', 'Customer City': 'New York', 'Zip': '10001' }
       ];
       
       const mapping = {
@@ -143,35 +154,8 @@ describe('columnDetection', () => {
         state: 'State Code',
         sale_amount: 'Total',
         transaction_count: null,
-        customer_address: null
-      };
-      
-      const transformed = transformDataWithMapping(data, mapping);
-      
-      expect(transformed[0]).toEqual({
-        date: '2024-01-01',
-        state: 'CA',
-        sale_amount: '1000'
-      });
-      
-      expect(transformed[1]).toEqual({
-        date: '2024-01-02',
-        state: 'NY',
-        sale_amount: '2000'
-      });
-    });
-
-    it('should preserve unmapped columns', () => {
-      const data = [
-        { 'date': '2024-01-01', 'state': 'CA', 'amount': '1000', 'extra': 'value' }
-      ];
-      
-      const mapping = {
-        date: 'date',
-        state: 'state',
-        sale_amount: 'amount',
-        transaction_count: null,
-        customer_address: null
+        city: 'Customer City',
+        zip_code: 'Zip'
       };
       
       const transformed = transformDataWithMapping(data, mapping);
@@ -180,6 +164,41 @@ describe('columnDetection', () => {
         date: '2024-01-01',
         state: 'CA',
         sale_amount: '1000',
+        city: 'Los Angeles',
+        zip_code: '90210'
+      });
+      
+      expect(transformed[1]).toEqual({
+        date: '2024-01-02',
+        state: 'NY',
+        sale_amount: '2000',
+        city: 'New York',
+        zip_code: '10001'
+      });
+    });
+
+    it('should preserve unmapped columns', () => {
+      const data = [
+        { 'date': '2024-01-01', 'state': 'CA', 'amount': '1000', 'city': 'LA', 'zip_code': '90210', 'extra': 'value' }
+      ];
+      
+      const mapping = {
+        date: 'date',
+        state: 'state',
+        sale_amount: 'amount',
+        transaction_count: null,
+        city: 'city',
+        zip_code: 'zip_code'
+      };
+      
+      const transformed = transformDataWithMapping(data, mapping);
+      
+      expect(transformed[0]).toEqual({
+        date: '2024-01-01',
+        state: 'CA',
+        sale_amount: '1000',
+        city: 'LA',
+        zip_code: '90210',
         extra: 'value'
       });
     });
@@ -197,13 +216,26 @@ describe('columnDetection', () => {
     });
 
     it('should have variations for optional columns', () => {
-      const optionalColumns = ['transaction_count', 'customer_address'];
+      const optionalColumns = ['transaction_count', 'city', 'zip_code'];
       
       for (const column of optionalColumns) {
         expect(COLUMN_MAPPINGS).toHaveProperty(column);
         expect(COLUMN_MAPPINGS[column]).toBeInstanceOf(Array);
         expect(COLUMN_MAPPINGS[column].length).toBeGreaterThan(0);
       }
+    });
+
+    it('should include city variations', () => {
+      expect(COLUMN_MAPPINGS.city).toContain('city');
+      expect(COLUMN_MAPPINGS.city).toContain('customer_city');
+      expect(COLUMN_MAPPINGS.city).toContain('billing_city');
+    });
+
+    it('should include zip code variations', () => {
+      expect(COLUMN_MAPPINGS.zip_code).toContain('zip_code');
+      expect(COLUMN_MAPPINGS.zip_code).toContain('zip');
+      expect(COLUMN_MAPPINGS.zip_code).toContain('postal_code');
+      expect(COLUMN_MAPPINGS.zip_code).toContain('zipcode');
     });
   });
 });

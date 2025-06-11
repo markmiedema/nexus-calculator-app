@@ -275,13 +275,13 @@ export const generateColumnMappingPreview = (detectionResult: DetectionResult): 
 
 // Generate CSV template for download
 export const generateCSVTemplate = (): string => {
-  const headers = ['date', 'state', 'sale_amount', 'transaction_count', 'customer_address'];
+  const headers = ['date', 'state', 'sale_amount', 'transaction_count', 'city', 'zip_code'];
   const sampleData = [
-    ['2024-01-15', 'CA', '1500.00', '1', '123 Main St, Los Angeles, CA'],
-    ['2024-01-16', 'TX', '2500.00', '2', '456 Oak Ave, Houston, TX'],
-    ['2024-01-17', 'NY', '3000.00', '1', '789 Pine St, New York, NY'],
-    ['2024-01-18', 'FL', '1200.00', '1', '321 Beach Blvd, Miami, FL'],
-    ['2024-01-19', 'WA', '1800.00', '3', '654 Cedar Ln, Seattle, WA']
+    ['2024-01-15', 'CA', '1500.00', '1', 'Los Angeles', '90210'],
+    ['2024-01-16', 'TX', '2500.00', '2', 'Houston', '77001'],
+    ['2024-01-17', 'NY', '3000.00', '1', 'New York', '10001'],
+    ['2024-01-18', 'FL', '1200.00', '1', 'Miami', '33101'],
+    ['2024-01-19', 'WA', '1800.00', '3', 'Seattle', '98101']
   ];
 
   const csvContent = [
@@ -357,7 +357,8 @@ const getColumnVariations = (standardColumn: string): string[] => {
     state: ['state', 'state_code', 'ship_to_state', 'billing_state'],
     sale_amount: ['sale_amount', 'amount', 'total', 'revenue', 'price'],
     transaction_count: ['transaction_count', 'quantity', 'qty', 'count'],
-    customer_address: ['customer_address', 'address', 'billing_address', 'shipping_address']
+    city: ['city', 'customer_city', 'billing_city', 'shipping_city'],
+    zip_code: ['zip_code', 'zip', 'postal_code', 'zipcode']
   };
   
   return variations[standardColumn] || [];
