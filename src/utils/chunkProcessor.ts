@@ -452,7 +452,7 @@ export const processDataInChunks = async <T, R>(
       config.workerPoolSize,
       chunks.length,
       () => new Worker(
-        new URL('../workers/csvProcessor.worker.ts', import.meta.url),
+        new URL('../workers/chunkProcessor.worker.ts', import.meta.url),
         { type: 'module' }
       ),
       onProgress
