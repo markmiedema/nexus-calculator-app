@@ -429,3 +429,5 @@ const ProcessingStatistics: React.FC<ProcessingStatisticsProps> = ({
 };
 
 export default ProcessingStatistics;
+
+export { ProcessingStatistics }
