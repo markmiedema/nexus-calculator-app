@@ -103,9 +103,7 @@ export const COLUMN_MAPPINGS: ColumnMapping = {
     'sales count',
     'number_of_transactions',
     'num_transactions',
-    'trans_count',
-    'item_count',
-    'item count'
+    'trans_count'
   ],
   city: [
     'city',
@@ -171,7 +169,7 @@ export const COLUMN_MAPPINGS: ColumnMapping = {
   ]
 };
 
-// Enhanced similarity calculation with better word boundary detection
+// Calculate similarity score between header and target variation
 export const calculateSimilarity = (header: string, target: string): number => {
   const normalizedHeader = header.toLowerCase().trim();
   const normalizedTarget = target.toLowerCase().trim();
@@ -189,73 +187,16 @@ export const calculateSimilarity = (header: string, target: string): number => {
     return 95;
   }
   
-  // CRITICAL FIX: Prevent "county" from matching "count" by checking word boundaries
-  // If target is a substring but not a complete word, reduce score significantly
-  if (normalizedTarget.length >= 4) { // Only for meaningful words
-    const headerWords = normalizedHeader.split(/[_\-\s]+/);
-    const targetWords = normalizedTarget.split(/[_\-\s]+/);
-    
-    // Check for exact word matches first
-    let exactWordMatches = 0;
-    let partialWordMatches = 0;
-    
-    for (const targetWord of targetWords) {
-      if (headerWords.includes(targetWord)) {
-        exactWordMatches++;
-      } else {
-        // Check if any header word contains this target word as substring
-        const hasPartialMatch = headerWords.some(headerWord => 
-          headerWord.includes(targetWord) && headerWord !== targetWord
-        );
-        if (hasPartialMatch) {
-          partialWordMatches++;
-        }
-      }
-    }
-    
-    // If all target words are exact matches, high score
-    if (exactWordMatches === targetWords.length) {
-      return 90;
-    }
-    
-    // If we have partial matches but no exact matches, be more cautious
-    if (exactWordMatches === 0 && partialWordMatches > 0) {
-      // Special case: prevent "county" from matching "count"
-      if (targetWords.includes('count') && headerWords.some(w => w === 'county')) {
-        return 25; // Very low score
-      }
-      
-      // For other partial matches, give moderate score
-      return 50;
-    }
-    
-    // Mixed exact and partial matches
-    if (exactWordMatches > 0) {
-      return 70 + (exactWordMatches / targetWords.length) * 20;
-    }
+  // Check if header contains target as whole word
+  const headerWords = normalizedHeader.split(/[_\-\s]+/);
+  const targetWords = normalizedTarget.split(/[_\-\s]+/);
+  
+  // All target words found in header
+  if (targetWords.every(word => headerWords.includes(word))) {
+    return 90;
   }
   
-  // Substring matching with word boundary awareness
-  if (normalizedHeader.includes(normalizedTarget)) {
-    // Check if it's a word boundary match
-    const regex = new RegExp(`\\b${normalizedTarget}\\b`);
-    if (regex.test(normalizedHeader)) {
-      return 80; // Word boundary match
-    } else {
-      return 60; // Substring match but not word boundary
-    }
-  }
-  
-  if (normalizedTarget.includes(normalizedHeader)) {
-    const regex = new RegExp(`\\b${normalizedHeader}\\b`);
-    if (regex.test(normalizedTarget)) {
-      return 75; // Word boundary match
-    } else {
-      return 55; // Substring match but not word boundary
-    }
-  }
-  
-  // Basic character similarity as fallback
+  // Partial word matching
   let matchingChars = 0;
   const maxLength = Math.max(normalizedHeader.length, normalizedTarget.length);
   
@@ -265,23 +206,32 @@ export const calculateSimilarity = (header: string, target: string): number => {
     }
   }
   
+  // Substring matching bonus
+  if (normalizedHeader.includes(normalizedTarget) || normalizedTarget.includes(normalizedHeader)) {
+    return Math.max(70, (matchingChars / maxLength) * 100 + 20);
+  }
+  
+  // Basic character similarity
   return (matchingChars / maxLength) * 100;
 };
 
-// Enhanced column detection with conflict resolution
+// Detect columns with confidence scoring
 export const detectColumns = (rawHeaders: string[]): DetectionResult => {
   const mapping: { [standardName: string]: string | null } = {};
   const confidence: { [standardName: string]: number } = {};
   const suggestions: { [standardName: string]: string[] } = {};
   const usedHeaders = new Set<string>();
   
-  // First pass: collect all potential matches for each standard column
-  const allMatches: { [standardName: string]: Array<{ header: string; score: number }> } = {};
-  
+  // For each standard column, find the best match
   for (const [standardName, variations] of Object.entries(COLUMN_MAPPINGS)) {
-    allMatches[standardName] = [];
+    let bestMatch: string | null = null;
+    let bestScore = 0;
+    const candidateScores: Array<{ header: string; score: number }> = [];
     
+    // Test each raw header against all variations for this standard column
     for (const rawHeader of rawHeaders) {
+      if (usedHeaders.has(rawHeader)) continue;
+      
       let maxScore = 0;
       
       // Test against all variations
@@ -290,50 +240,27 @@ export const detectColumns = (rawHeaders: string[]): DetectionResult => {
         maxScore = Math.max(maxScore, score);
       }
       
-      if (maxScore >= 30) { // Lower threshold for collecting candidates
-        allMatches[standardName].push({ header: rawHeader, score: maxScore });
+      candidateScores.push({ header: rawHeader, score: maxScore });
+      
+      if (maxScore > bestScore) {
+        bestScore = maxScore;
+        bestMatch = rawHeader;
       }
     }
     
-    // Sort by score
-    allMatches[standardName].sort((a, b) => b.score - a.score);
-  }
-  
-  // Second pass: resolve conflicts by assigning headers to best matches
-  // Process in order of specificity (more specific columns first)
-  const processingOrder = [
-    'county',           // Process county first to avoid conflict with count
-    'transaction_count', // Then transaction count
-    'zip_code',         // Then zip code
-    'city',             // Then city
-    'date',             // Then required columns
-    'state',
-    'sale_amount'
-  ];
-  
-  for (const standardName of processingOrder) {
-    const candidates = allMatches[standardName] || [];
-    let bestMatch: { header: string; score: number } | null = null;
-    
-    // Find the best available match
-    for (const candidate of candidates) {
-      if (!usedHeaders.has(candidate.header) && candidate.score >= 60) {
-        bestMatch = candidate;
-        break;
-      }
-    }
-    
-    if (bestMatch) {
-      mapping[standardName] = bestMatch.header;
-      confidence[standardName] = bestMatch.score;
-      usedHeaders.add(bestMatch.header);
+    // Only accept matches with reasonable confidence (>= 60)
+    if (bestMatch && bestScore >= 60) {
+      mapping[standardName] = bestMatch;
+      confidence[standardName] = bestScore;
+      usedHeaders.add(bestMatch);
     } else {
       mapping[standardName] = null;
       confidence[standardName] = 0;
     }
     
-    // Store top 3 suggestions (including used headers for reference)
-    suggestions[standardName] = candidates
+    // Store top 3 suggestions for this column
+    suggestions[standardName] = candidateScores
+      .sort((a, b) => b.score - a.score)
       .slice(0, 3)
       .filter(candidate => candidate.score >= 30)
       .map(candidate => candidate.header);

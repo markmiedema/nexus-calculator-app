@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Upload, AlertCircle, FileText, CheckCircle, X, Download, Info, Eye } from 'lucide-react';
+import { Upload, AlertCircle, FileText, CheckCircle, X, Download, Info } from 'lucide-react';
 import ProgressIndicator from './ProgressIndicator';
 import ColumnMappingPreview from './ColumnMappingPreview';
 import { validateCSVWithSmartDetection, generateColumnMappingPreview, downloadCSVTemplate, ValidationResult } from '../utils/dataValidation';
@@ -104,6 +104,10 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload, isProcessing, err
       const result = validateCSVWithSmartDetection(data);
       setValidationResult(result);
       
+      if (result.isValid) {
+        setShowPreview(true);
+      }
+      
       setUploadProgress(100);
     } catch (err) {
       setValidationResult({
@@ -113,10 +117,6 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload, isProcessing, err
         suggestions: ['Please check your file format and try again']
       });
     }
-  };
-
-  const handleShowPreview = () => {
-    setShowPreview(true);
   };
 
   const handleProceedWithAnalysis = () => {
@@ -263,160 +263,6 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload, isProcessing, err
         )}
       </div>
 
-      {/* Enhanced Column Matching Results */}
-      {validationResult?.detectionResult && (
-        <div className="mt-6 space-y-4">
-          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-lg font-medium text-blue-800">📊 Column Detection Results</h3>
-              <div className="text-sm text-blue-600">
-                Overall Confidence: <span className="font-bold">
-                  {generateColumnMappingPreview(validationResult.detectionResult).overallConfidence.toFixed(1)}%
-                </span>
-              </div>
-            </div>
-            
-            {/* Column Matching Grid */}
-            <div className="grid md:grid-cols-2 gap-4">
-              {/* Successfully Matched Columns */}
-              <div className="bg-white rounded-lg p-4 border border-green-200">
-                <h4 className="font-medium text-green-800 mb-3 flex items-center">
-                  <CheckCircle className="h-4 w-4 mr-2" />
-                  ✅ Successfully Matched ({Object.values(validationResult.detectionResult.mapping).filter(v => v !== null).length})
-                </h4>
-                <div className="space-y-2">
-                  {Object.entries(validationResult.detectionResult.mapping)
-                    .filter(([_, header]) => header !== null)
-                    .map(([standardName, detectedHeader]) => {
-                      const confidence = validationResult.detectionResult!.confidence[standardName];
-                      const isRequired = ['date', 'state', 'sale_amount'].includes(standardName);
-                      return (
-                        <div key={standardName} className="flex items-center justify-between p-2 bg-green-50 rounded border border-green-100">
-                          <div className="flex items-center">
-                            <span className="font-medium text-gray-800">
-                              {standardName.replace('_', ' ')}
-                            </span>
-                            {isRequired && (
-                              <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded">
-                                Required
-                              </span>
-                            )}
-                          </div>
-                          <div className="text-right">
-                            <div className="text-sm font-medium text-gray-900">
-                              "{detectedHeader}"
-                            </div>
-                            <div className={`text-xs font-medium ${
-                              confidence >= 90 ? 'text-green-600' : 
-                              confidence >= 70 ? 'text-yellow-600' : 'text-red-600'
-                            }`}>
-                              {confidence.toFixed(1)}% match
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                </div>
-              </div>
-
-              {/* Missing/Unmatched Columns */}
-              <div className="bg-white rounded-lg p-4 border border-gray-200">
-                <h4 className="font-medium text-gray-800 mb-3 flex items-center">
-                  <Info className="h-4 w-4 mr-2" />
-                  📋 Column Status Summary
-                </h4>
-                <div className="space-y-3">
-                  {/* Missing Required Columns */}
-                  {Object.entries(validationResult.detectionResult.mapping)
-                    .filter(([standardName, header]) => header === null && ['date', 'state', 'sale_amount'].includes(standardName))
-                    .map(([standardName]) => (
-                      <div key={standardName} className="flex items-center justify-between p-2 bg-red-50 rounded border border-red-100">
-                        <div className="flex items-center">
-                          <XCircle className="h-4 w-4 text-red-500 mr-2" />
-                          <span className="font-medium text-red-800">
-                            {standardName.replace('_', ' ')} (Required)
-                          </span>
-                        </div>
-                        <span className="text-xs text-red-600 font-medium">Not Found</span>
-                      </div>
-                    ))}
-
-                  {/* Missing Optional Columns */}
-                  {Object.entries(validationResult.detectionResult.mapping)
-                    .filter(([standardName, header]) => header === null && !['date', 'state', 'sale_amount'].includes(standardName))
-                    .map(([standardName]) => (
-                      <div key={standardName} className="flex items-center justify-between p-2 bg-gray-50 rounded border border-gray-100">
-                        <div className="flex items-center">
-                          <AlertCircle className="h-4 w-4 text-gray-400 mr-2" />
-                          <span className="text-gray-600">
-                            {standardName.replace('_', ' ')} (Optional)
-                          </span>
-                        </div>
-                        <span className="text-xs text-gray-500">Not Found</span>
-                      </div>
-                    ))}
-
-                  {/* Unmapped Headers */}
-                  {validationResult.detectionResult.unmappedHeaders.length > 0 && (
-                    <div className="p-2 bg-blue-50 rounded border border-blue-100">
-                      <div className="text-sm font-medium text-blue-800 mb-1">
-                        Unmapped Columns ({validationResult.detectionResult.unmappedHeaders.length}):
-                      </div>
-                      <div className="flex flex-wrap gap-1">
-                        {validationResult.detectionResult.unmappedHeaders.map(header => (
-                          <span key={header} className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
-                            "{header}"
-                          </span>
-                        ))}
-                      </div>
-                      <div className="text-xs text-blue-600 mt-1">
-                        These will be preserved but not used in analysis
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex items-center justify-between mt-4 pt-3 border-t border-blue-200">
-              <div className="text-sm text-blue-700">
-                {validationResult.isValid ? (
-                  <span className="flex items-center">
-                    <CheckCircle className="h-4 w-4 mr-1 text-green-500" />
-                    Ready for analysis
-                  </span>
-                ) : (
-                  <span className="flex items-center">
-                    <XCircle className="h-4 w-4 mr-1 text-red-500" />
-                    Missing required columns
-                  </span>
-                )}
-              </div>
-              
-              <div className="flex space-x-2">
-                <button
-                  onClick={handleShowPreview}
-                  className="flex items-center px-3 py-1.5 text-sm font-medium text-blue-600 bg-white border border-blue-300 rounded-md hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-                >
-                  <Eye className="h-4 w-4 mr-1" />
-                  Review Mappings
-                </button>
-                
-                {validationResult.isValid && (
-                  <button
-                    onClick={handleProceedWithAnalysis}
-                    className="px-3 py-1.5 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
-                  >
-                    Proceed with Analysis
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Validation Results */}
       {validationResult && (
         <div className="mt-6 space-y-4">
@@ -454,6 +300,21 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload, isProcessing, err
             </div>
           )}
 
+          {/* Success */}
+          {validationResult.isValid && (
+            <div className="p-4 bg-green-50 border border-green-200 rounded-md">
+              <div className="flex items-start">
+                <CheckCircle className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0 mr-3" />
+                <div>
+                  <h3 className="text-green-800 font-medium">File Validated Successfully</h3>
+                  <p className="mt-1 text-sm text-green-700">
+                    All required columns detected. Click "Review Mappings" to proceed.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Suggestions */}
           {validationResult.suggestions.length > 0 && (
             <div className="p-4 bg-blue-50 border border-blue-200 rounded-md">
@@ -484,7 +345,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload, isProcessing, err
         </div>
       )}
 
-      {/* Enhanced Format Requirements */}
+      {/* Format Requirements */}
       <div className="mt-6 border-t border-gray-200 pt-4">
         <h3 className="text-sm font-medium text-gray-700 mb-3">Smart Column Detection</h3>
         <div className="grid md:grid-cols-2 gap-4 text-sm text-gray-600">
@@ -497,45 +358,19 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload, isProcessing, err
             </ul>
           </div>
           <div>
-            <h4 className="font-medium text-gray-700 mb-2">Optional Columns (enhanced):</h4>
+            <h4 className="font-medium text-gray-700 mb-2">Optional Columns:</h4>
             <ul className="space-y-1 list-disc pl-5">
               <li><strong>Quantity:</strong> transaction_count, qty, units, etc.</li>
               <li><strong>City:</strong> city, customer_city, billing_city, etc.</li>
-              <li><strong>County:</strong> county, customer_county, parish, borough, etc.</li>
+              <li><strong>County:</strong> county, customer_county, billing_county, etc.</li>
               <li><strong>Zip Code:</strong> zip_code, zip, postal_code, etc.</li>
             </ul>
           </div>
         </div>
-        
-        {/* Enhanced Template Information */}
-        <div className="mt-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
-          <h4 className="font-medium text-blue-800 mb-2">📋 Enhanced Template Features</h4>
-          <div className="grid md:grid-cols-2 gap-3 text-sm text-blue-700">
-            <div>
-              <p className="font-medium mb-1">✨ What's New:</p>
-              <ul className="space-y-1 text-xs">
-                <li>• Comprehensive geographic data (city, county, zip)</li>
-                <li>• 20 sample transactions across major US markets</li>
-                <li>• Realistic county variations (parishes, boroughs)</li>
-                <li>• Enhanced nexus analysis capabilities</li>
-              </ul>
-            </div>
-            <div>
-              <p className="font-medium mb-1">🎯 Perfect For:</p>
-              <ul className="space-y-1 text-xs">
-                <li>• Multi-state e-commerce businesses</li>
-                <li>• Detailed geographic nexus analysis</li>
-                <li>• Local tax jurisdiction tracking</li>
-                <li>• Comprehensive compliance reporting</li>
-              </ul>
-            </div>
-          </div>
-        </div>
-        
-        <div className="mt-3 p-3 bg-green-50 rounded-md border border-green-200">
-          <p className="text-sm text-green-700">
-            <strong>🚀 Smart Detection:</strong> Our enhanced system automatically identifies columns using fuzzy matching, 
-            supporting various naming conventions and formats. Now includes geographic data for more precise nexus analysis!
+        <div className="mt-3 p-3 bg-blue-50 rounded-md">
+          <p className="text-sm text-blue-700">
+            <strong>Smart Detection:</strong> Our system automatically identifies columns using fuzzy matching, 
+            supporting various naming conventions and formats. No need to rename your columns!
           </p>
         </div>
       </div>
