@@ -182,12 +182,12 @@ const finalizeProcessing = async (
   onProgress?: ProgressCallback,
   startProgress: number = 85
 ): Promise<ProcessedData> => {
-  // Aggregate sales by state and year (NON-CUMULATIVE)
-  const salesByState = aggregateSalesByStateAndYear(cleanedData);
+  // Aggregate sales by state
+  const salesByState = aggregateSalesByState(cleanedData);
   if (onProgress) onProgress(startProgress + 5);
   
-  // Determine nexus states (year by year analysis)
-  const nexusStates = determineNexusStatesYearly(salesByState);
+  // Determine nexus states
+  const nexusStates = determineNexusStates(salesByState);
   if (onProgress) onProgress(startProgress + 10);
   
   // Calculate tax liabilities
@@ -213,12 +213,11 @@ const finalizeProcessing = async (
   // Extract available years
   const availableYears = [...new Set(cleanedData.map(row => row.date.substring(0, 4)))].sort();
 
-  // Format salesByState for return value
+  // Format salesByState
   const formattedSalesByState = Object.entries(salesByState).map(([stateCode, data]) => {
     const thresholds = determineStateThresholds(stateCode);
     const taxRate = getStateTaxRate(stateCode);
     
-    // Calculate threshold proximity based on CURRENT YEAR only
     const currentYear = new Date().getFullYear().toString();
     const currentYearData = data.annualSales[currentYear] || {
       totalRevenue: 0,
@@ -238,14 +237,14 @@ const finalizeProcessing = async (
     return {
       code: stateCode,
       name: getStateName(stateCode),
-      totalRevenue: data.totalRevenue, // This is still total across all years for display
+      totalRevenue: data.totalRevenue,
       transactionCount: data.transactionCount,
       monthlyRevenue: data.monthlyRevenue,
       revenueThreshold: thresholds.revenue,
       transactionThreshold: thresholds.transactions,
       thresholdProximity,
       taxRate: Number(taxRate.toFixed(2)),
-      annualData: data.annualSales // Include annual breakdown
+      annualData: {}
     };
   });
 
@@ -341,12 +340,12 @@ export const processCSVDataOriginal = async (
       }
     );
     
-    // Process the data to determine nexus by year (NON-CUMULATIVE)
-    const salesByState = aggregateSalesByStateAndYear(processedData);
+    // Process the data to determine nexus by year
+    const salesByState = aggregateSalesByState(processedData);
     if (onProgress) onProgress(75);
     
-    // Calculate nexus for each state based on ANNUAL thresholds (not cumulative)
-    const nexusStates = determineNexusStatesYearly(salesByState);
+    // Calculate nexus for each state based on annual thresholds
+    const nexusStates = determineNexusStates(salesByState);
     if (onProgress) onProgress(85);
     
     // Calculate tax liability
@@ -377,14 +376,14 @@ export const processCSVDataOriginal = async (
       const thresholds = determineStateThresholds(stateCode);
       const taxRate = getStateTaxRate(stateCode);
       
-      // Calculate current year's threshold proximity (NOT cumulative)
+      // Calculate current year's threshold proximity
       const currentYear = new Date().getFullYear().toString();
       const currentYearData = data.annualSales[currentYear] || {
         totalRevenue: 0,
         transactionCount: 0
       };
       
-      // Calculate threshold proximity as a percentage for CURRENT YEAR ONLY
+      // Calculate threshold proximity as a percentage
       const revenueProximity = thresholds.revenue > 0 
         ? Number(((currentYearData.totalRevenue / thresholds.revenue) * 100).toFixed(2))
         : 0;
@@ -399,14 +398,14 @@ export const processCSVDataOriginal = async (
       return {
         code: stateCode,
         name: getStateName(stateCode),
-        totalRevenue: data.totalRevenue, // Total across all years for display
+        totalRevenue: data.totalRevenue,
         transactionCount: data.transactionCount,
         monthlyRevenue: data.monthlyRevenue,
         revenueThreshold: thresholds.revenue,
         transactionThreshold: thresholds.transactions,
         thresholdProximity,
         taxRate: Number(taxRate.toFixed(2)),
-        annualData: data.annualSales // Include annual breakdown
+        annualData: {}
       };
     });
 
@@ -514,8 +513,7 @@ const parseCSV = (text: string): any[] => {
   });
 };
 
-// FIXED: Non-cumulative aggregation by state and year
-const aggregateSalesByStateAndYear = (data: any[]): StateSales => {
+const aggregateSalesByState = (data: any[]): StateSales => {
   const salesByState: StateSales = {};
   
   data.forEach(row => {
@@ -543,14 +541,14 @@ const aggregateSalesByStateAndYear = (data: any[]): StateSales => {
       };
     }
     
-    // Update annual totals for this specific year
+    // Update annual totals
     salesByState[state].annualSales[year].totalRevenue += amount;
     salesByState[state].annualSales[year].transactionCount += transactionCount;
     if (date < salesByState[state].annualSales[year].firstTransactionDate) {
       salesByState[state].annualSales[year].firstTransactionDate = date;
     }
     
-    // Update overall totals (for display purposes)
+    // Update overall totals
     salesByState[state].totalRevenue += amount;
     salesByState[state].transactionCount += transactionCount;
     
@@ -573,19 +571,16 @@ const aggregateSalesByStateAndYear = (data: any[]): StateSales => {
   return salesByState;
 };
 
-// FIXED: Determine nexus states based on YEARLY thresholds (not cumulative)
-const determineNexusStatesYearly = (salesByState: StateSales): NexusState[] => {
+const determineNexusStates = (salesByState: StateSales): NexusState[] => {
   const nexusStates: NexusState[] = [];
   
   Object.entries(salesByState).forEach(([stateCode, data]) => {
     const thresholds = determineStateThresholds(stateCode);
     let earliestNexusDate: string | null = null;
     let nexusTriggeredBy: 'revenue' | 'transactions' = 'revenue';
-    let nexusYear: string | null = null;
     
-    // Check each year INDEPENDENTLY for nexus
+    // Check each year for nexus
     Object.entries(data.annualSales).forEach(([year, yearData]) => {
-      // Each year is evaluated against thresholds independently
       const hasRevenueNexus = yearData.totalRevenue >= thresholds.revenue;
       const hasTransactionNexus = thresholds.transactions !== null && 
         yearData.transactionCount >= thresholds.transactions;
@@ -595,27 +590,15 @@ const determineNexusStatesYearly = (salesByState: StateSales): NexusState[] => {
         if (!earliestNexusDate || nexusDate < earliestNexusDate) {
           earliestNexusDate = nexusDate;
           nexusTriggeredBy = hasRevenueNexus ? 'revenue' : 'transactions';
-          nexusYear = year;
         }
       }
     });
     
-    if (earliestNexusDate && nexusYear) {
-      // Calculate liability only from the nexus year forward
-      let totalLiabilityRevenue = 0;
-      const nexusYearNum = parseInt(nexusYear);
-      
-      // Sum revenue from nexus year forward for liability calculation
-      Object.entries(data.annualSales).forEach(([year, yearData]) => {
-        if (parseInt(year) >= nexusYearNum) {
-          totalLiabilityRevenue += yearData.totalRevenue;
-        }
-      });
-
+    if (earliestNexusDate) {
       nexusStates.push({
         code: stateCode,
         name: getStateName(stateCode),
-        totalRevenue: data.totalRevenue, // Total for display
+        totalRevenue: data.totalRevenue,
         transactionCount: data.transactionCount,
         monthlyRevenue: data.monthlyRevenue,
         nexusDate: earliestNexusDate,
@@ -623,13 +606,13 @@ const determineNexusStatesYearly = (salesByState: StateSales): NexusState[] => {
         revenueThreshold: thresholds.revenue,
         transactionThreshold: thresholds.transactions,
         registrationDeadline: calculateRegistrationDeadline(earliestNexusDate),
-        filingFrequency: determineFilingFrequency(totalLiabilityRevenue),
+        filingFrequency: determineFilingFrequency(data.totalRevenue),
         taxRate: 0,
         liability: 0,
         preNexusRevenue: 0,
-        postNexusRevenue: totalLiabilityRevenue,
+        postNexusRevenue: 0,
         effectiveDate: earliestNexusDate,
-        annualData: data.annualSales
+        annualData: {}
       });
     }
   });
@@ -641,7 +624,7 @@ const calculateTaxLiabilities = (states: NexusState[]): NexusState[] => {
   return states.map(state => {
     const { liability, taxRate } = calculateTaxLiability(
       state.code,
-      state.postNexusRevenue, // Use post-nexus revenue for liability calculation
+      state.totalRevenue,
       state.nexusDate,
       state.monthlyRevenue
     );

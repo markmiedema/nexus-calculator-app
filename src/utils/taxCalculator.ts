@@ -32,7 +32,7 @@ export const calculateTaxLiability = (
   
   let preNexusRevenue = 0;
   let postNexusRevenue = 0;
-  let effectiveDate = nexusDate;
+  let effectiveDate = '';
   
   // Sort data chronologically
   const sortedData = [...monthlyData].sort(
@@ -41,12 +41,24 @@ export const calculateTaxLiability = (
   
   // Calculate pre and post nexus revenue
   for (const month of sortedData) {
-    const isAfterNexus = isWithinNexusPeriod(month.date, nexusDate);
+    const monthDate = new Date(month.date);
+    const nexusDateObj = new Date(nexusDate);
     
-    if (isAfterNexus) {
-      postNexusRevenue += month.revenue;
-    } else {
+    if (monthDate < nexusDateObj) {
       preNexusRevenue += month.revenue;
+    } else if (monthDate.getTime() === nexusDateObj.getTime()) {
+      // For the nexus month, we need to handle partial taxation
+      const nexusThreshold = determineNexusThreshold(stateCode);
+      const amountOverThreshold = month.revenue - (nexusThreshold - preNexusRevenue);
+      if (amountOverThreshold > 0) {
+        postNexusRevenue += amountOverThreshold;
+        preNexusRevenue += month.revenue - amountOverThreshold;
+      } else {
+        preNexusRevenue += month.revenue;
+      }
+      effectiveDate = nexusDate;
+    } else {
+      postNexusRevenue += month.revenue;
     }
   }
   
@@ -60,6 +72,12 @@ export const calculateTaxLiability = (
     postNexusRevenue,
     effectiveDate
   };
+};
+
+const determineNexusThreshold = (stateCode: string): number => {
+  // This would normally come from a configuration file or database
+  // For now, using standard threshold
+  return 100000;
 };
 
 export const estimatePenalties = (

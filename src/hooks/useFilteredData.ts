@@ -36,127 +36,74 @@ export const useFilteredData = (originalData: ProcessedData): ProcessedData => {
       const totalRevenue = filteredMonthlyRevenue.reduce((sum, month) => sum + month.revenue, 0);
       const transactionCount = filteredMonthlyRevenue.reduce((sum, month) => sum + month.transactions, 0);
 
-      // Get annual data for selected years
-      const filteredAnnualData: Record<string, any> = {};
-      for (const year of selectedYears) {
-        if (state.annualData && state.annualData[year]) {
-          filteredAnnualData[year] = state.annualData[year];
-        }
-      }
-
-      // Recalculate threshold proximity based on CURRENT YEAR ONLY or most recent selected year
+      // Recalculate threshold proximity
       const thresholds = determineStateThresholds(state.code);
-      let thresholdProximity = 0;
-      
-      // Find the most recent selected year that has data
-      const sortedYears = [...selectedYears].sort().reverse();
-      for (const year of sortedYears) {
-        if (filteredAnnualData[year]) {
-          const yearData = filteredAnnualData[year];
-          const revenueProximity = thresholds.revenue > 0
-            ? Number(((yearData.totalRevenue / thresholds.revenue) * 100).toFixed(2))
-            : 0;
-          const transactionProximity = thresholds.transactions
-            ? Number(((yearData.transactionCount / thresholds.transactions) * 100).toFixed(2))
-            : 0;
-          thresholdProximity = Math.max(revenueProximity, transactionProximity);
-          break;
-        }
-      }
+      const revenueProximity = thresholds.revenue > 0
+        ? Number(((totalRevenue / thresholds.revenue) * 100).toFixed(2))
+        : 0;
+      const transactionProximity = thresholds.transactions
+        ? Number(((transactionCount / thresholds.transactions) * 100).toFixed(2))
+        : 0;
+      const thresholdProximity = Math.max(revenueProximity, transactionProximity);
 
       return {
         ...state,
         totalRevenue,
         transactionCount,
         thresholdProximity,
-        monthlyRevenue: filteredMonthlyRevenue,
-        annualData: filteredAnnualData
+        monthlyRevenue: filteredMonthlyRevenue
       };
     });
 
     // Recalculate nexus states based on filtered data
-    // We need to check each year independently
     const nexusStates: NexusState[] = [];
 
     filteredSalesByState.forEach(state => {
-      // Check each selected year independently for nexus
-      let earliestNexusDate: string | null = null;
-      let nexusTriggeredBy: 'revenue' | 'transactions' = 'revenue';
-      let postNexusRevenue = 0;
-      
-      for (const year of selectedYears) {
-        const yearData = state.annualData[year];
-        if (!yearData) continue;
-        
-        const thresholds = determineStateThresholds(state.code);
-        
-        // Check if this year alone meets the threshold
-        const hasRevenueNexus = yearData.totalRevenue >= thresholds.revenue;
-        const hasTransactionNexus = thresholds.transactions !== null && 
-          yearData.transactionCount >= thresholds.transactions;
-        
-        if (hasRevenueNexus || hasTransactionNexus) {
-          // Find the first transaction date in this year
-          const yearMonthlyData = state.monthlyRevenue.filter(m => m.date.startsWith(year));
-          if (yearMonthlyData.length === 0) continue;
-          
-          const firstDateInYear = yearMonthlyData
-            .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())[0].date;
-          
-          if (!earliestNexusDate || firstDateInYear < earliestNexusDate) {
-            earliestNexusDate = firstDateInYear;
-            nexusTriggeredBy = hasRevenueNexus ? 'revenue' : 'transactions';
-          }
-        }
-      }
-      
-      if (earliestNexusDate) {
-        // Calculate post-nexus revenue
-        for (const year of selectedYears) {
-          const yearData = state.annualData[year];
-          if (!yearData) continue;
-          
-          const yearStart = `${year}-01-01`;
-          if (yearStart >= earliestNexusDate) {
-            // If the whole year is after nexus date, add all revenue
-            postNexusRevenue += yearData.totalRevenue;
-          } else {
-            // If nexus was established during this year, calculate partial year revenue
-            const nexusDateObj = new Date(earliestNexusDate);
-            const yearMonthlyData = state.monthlyRevenue.filter(m => 
-              m.date.startsWith(year) && new Date(m.date) >= nexusDateObj
-            );
-            const partialYearRevenue = yearMonthlyData.reduce((sum, m) => sum + m.revenue, 0);
-            postNexusRevenue += partialYearRevenue;
-          }
-        }
-        
-        const { liability, taxRate } = calculateTaxLiability(
-          state.code,
-          postNexusRevenue,
-          earliestNexusDate,
-          state.monthlyRevenue.filter(m => selectedYears.includes(m.date.substring(0, 4)))
-        );
+      if (state.thresholdProximity >= 100) {
+        // Find when nexus was first established within selected years
+        let runningRevenue = 0;
+        let runningTransactions = 0;
+        let nexusDate = '';
 
-        nexusStates.push({
-          code: state.code,
-          name: state.name,
-          totalRevenue: state.totalRevenue,
-          transactionCount: state.transactionCount,
-          monthlyRevenue: state.monthlyRevenue,
-          nexusDate: earliestNexusDate,
-          thresholdTriggered: nexusTriggeredBy,
-          revenueThreshold: state.revenueThreshold,
-          transactionThreshold: state.transactionThreshold,
-          registrationDeadline: calculateRegistrationDeadline(earliestNexusDate),
-          filingFrequency: determineFilingFrequency(postNexusRevenue),
-          taxRate,
-          liability,
-          preNexusRevenue: state.totalRevenue - postNexusRevenue,
-          postNexusRevenue,
-          effectiveDate: earliestNexusDate,
-          annualData: state.annualData
-        });
+        for (const month of state.monthlyRevenue) {
+          runningRevenue += month.revenue;
+          runningTransactions += month.transactions;
+
+          if (runningRevenue >= state.revenueThreshold ||
+              (state.transactionThreshold && runningTransactions >= state.transactionThreshold)) {
+            nexusDate = month.date;
+            break;
+          }
+        }
+
+        if (nexusDate) {
+          const { liability, taxRate } = calculateTaxLiability(
+            state.code,
+            state.totalRevenue,
+            nexusDate,
+            state.monthlyRevenue
+          );
+
+          nexusStates.push({
+            code: state.code,
+            name: state.name,
+            totalRevenue: state.totalRevenue,
+            transactionCount: state.transactionCount,
+            monthlyRevenue: state.monthlyRevenue,
+            nexusDate,
+            thresholdTriggered: runningRevenue >= state.revenueThreshold ? 'revenue' : 'transactions',
+            revenueThreshold: state.revenueThreshold,
+            transactionThreshold: state.transactionThreshold,
+            registrationDeadline: calculateRegistrationDeadline(nexusDate),
+            filingFrequency: determineFilingFrequency(state.totalRevenue),
+            taxRate,
+            liability,
+            preNexusRevenue: 0,
+            postNexusRevenue: state.totalRevenue,
+            effectiveDate: nexusDate,
+            annualData: {}
+          });
+        }
       }
     });
 
