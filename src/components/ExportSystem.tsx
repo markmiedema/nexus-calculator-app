@@ -1,20 +1,18 @@
 import React, { useState } from 'react';
 import { ProcessedData } from '../types';
-import { ExportConfig, ExportTemplate } from '../types/export';
-import { exportData, EXPORT_TEMPLATES, getExportTemplate } from '../utils/exportSystem';
+import { ExportResult } from '../types/export';
+import ExportDialog from './ExportDialog';
+import ExportHistory from './ExportHistory';
+import ExportTemplateManager from './ExportTemplateManager';
 import { 
   Download, 
-  FileText, 
-  FileSpreadsheet, 
-  FileJson, 
+  History, 
   Settings, 
-  Eye, 
-  EyeOff, 
-  Calendar,
-  Shield,
-  CheckCircle,
-  AlertCircle,
-  Info
+  Share2,
+  FileText,
+  BarChart3,
+  Users,
+  Shield
 } from 'lucide-react';
 
 interface ExportSystemProps {
@@ -23,336 +21,237 @@ interface ExportSystemProps {
 }
 
 const ExportSystem: React.FC<ExportSystemProps> = ({ data, className = '' }) => {
-  const [selectedTemplate, setSelectedTemplate] = useState<string>('full-analysis');
-  const [customConfig, setCustomConfig] = useState<ExportConfig>({
-    format: 'excel',
-    includeRawData: true,
-    includeSummary: true,
-    includeStateAnalysis: true,
-    includeRecommendations: true,
-    sanitizeData: false
-  });
-  const [isExporting, setIsExporting] = useState(false);
-  const [showCustomConfig, setShowCustomConfig] = useState(false);
-  const [exportResult, setExportResult] = useState<any>(null);
+  const [showExportDialog, setShowExportDialog] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [showTemplateManager, setShowTemplateManager] = useState(false);
+  const [activeView, setActiveView] = useState<'overview' | 'history' | 'templates'>('overview');
 
-  const handleTemplateExport = async (templateId: string) => {
-    const template = getExportTemplate(templateId);
-    if (!template) return;
-
-    setIsExporting(true);
-    setExportResult(null);
-
-    try {
-      const result = await exportData(data, template.config);
-      setExportResult(result);
-    } catch (error) {
-      setExportResult({
-        success: false,
-        error: error instanceof Error ? error.message : 'Export failed'
-      });
-    } finally {
-      setIsExporting(false);
+  const handleExportComplete = (result: ExportResult) => {
+    // Add to history if the global function is available
+    if ((window as any).addExportToHistory) {
+      (window as any).addExportToHistory(result, undefined, data.dataRange);
     }
   };
 
-  const handleCustomExport = async () => {
-    setIsExporting(true);
-    setExportResult(null);
-
-    try {
-      const result = await exportData(data, customConfig);
-      setExportResult(result);
-    } catch (error) {
-      setExportResult({
-        success: false,
-        error: error instanceof Error ? error.message : 'Export failed'
-      });
-    } finally {
-      setIsExporting(false);
+  const getQuickExportOptions = () => [
+    {
+      id: 'executive-summary',
+      name: 'Executive Summary',
+      description: 'High-level overview for presentations',
+      format: 'pdf',
+      icon: <FileText className="h-5 w-5 text-red-600" />,
+      useCase: 'Board meetings and executive reviews'
+    },
+    {
+      id: 'full-analysis',
+      name: 'Complete Analysis',
+      description: 'Comprehensive Excel report',
+      format: 'excel',
+      icon: <BarChart3 className="h-5 w-5 text-green-600" />,
+      useCase: 'Detailed compliance analysis'
+    },
+    {
+      id: 'compliance-data',
+      name: 'Compliance Data',
+      description: 'JSON format for system integration',
+      format: 'json',
+      icon: <Settings className="h-5 w-5 text-purple-600" />,
+      useCase: 'Automated compliance systems'
     }
-  };
+  ];
 
-  const getFormatIcon = (format: string) => {
-    switch (format) {
-      case 'excel':
-        return <FileSpreadsheet className="h-5 w-5 text-green-600" />;
-      case 'csv':
-        return <FileText className="h-5 w-5 text-blue-600" />;
-      case 'json':
-        return <FileJson className="h-5 w-5 text-purple-600" />;
-      case 'pdf':
-        return <FileText className="h-5 w-5 text-red-600" />;
-      default:
-        return <FileText className="h-5 w-5 text-gray-600" />;
+  const getSharingRecommendations = () => [
+    {
+      audience: 'Internal Team',
+      recommendation: 'Use Complete Analysis (Excel) with full data',
+      icon: <Users className="h-5 w-5 text-blue-600" />,
+      security: 'Full access to sensitive data'
+    },
+    {
+      audience: 'External Auditors',
+      recommendation: 'Use Audit Documentation with sanitized data',
+      icon: <Shield className="h-5 w-5 text-green-600" />,
+      security: 'Sanitized for external sharing'
+    },
+    {
+      audience: 'Executive Leadership',
+      recommendation: 'Use Executive Summary (PDF) format',
+      icon: <FileText className="h-5 w-5 text-purple-600" />,
+      security: 'High-level overview only'
+    },
+    {
+      audience: 'Compliance Systems',
+      recommendation: 'Use JSON format for automated processing',
+      icon: <Settings className="h-5 w-5 text-orange-600" />,
+      security: 'Machine-readable structured data'
     }
-  };
+  ];
 
-  const getFormatDescription = (format: string) => {
-    switch (format) {
-      case 'excel':
-        return 'Multi-sheet Excel workbook with formatted data';
-      case 'csv':
-        return 'Comma-separated values for data analysis';
-      case 'json':
-        return 'Machine-readable format for system integration';
-      case 'pdf':
-        return 'Professional report for presentations';
-      default:
-        return 'Data export';
-    }
-  };
+  const quickExportOptions = getQuickExportOptions();
+  const sharingRecommendations = getSharingRecommendations();
 
   return (
-    <div className={`bg-white rounded-lg shadow-md ${className}`}>
-      <div className="p-6 border-b border-gray-200">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-xl font-bold text-gray-800">Export Analysis</h2>
-            <p className="text-sm text-gray-600 mt-1">
-              Export your SALT nexus analysis in multiple formats
-            </p>
-          </div>
+    <div className={`space-y-6 ${className}`}>
+      {/* Navigation Tabs */}
+      <div className="border-b border-gray-200">
+        <nav className="flex space-x-8">
           <button
-            onClick={() => setShowCustomConfig(!showCustomConfig)}
-            className="flex items-center px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors"
+            onClick={() => setActiveView('overview')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              activeView === 'overview'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
           >
-            <Settings className="h-4 w-4 mr-2" />
-            Custom Export
+            Export Options
           </button>
-        </div>
+          <button
+            onClick={() => setActiveView('history')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              activeView === 'history'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            Export History
+          </button>
+          <button
+            onClick={() => setActiveView('templates')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              activeView === 'templates'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            Template Manager
+          </button>
+        </nav>
       </div>
 
-      <div className="p-6">
-        {/* Export Templates */}
-        <div className="mb-8">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">Export Templates</h3>
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {EXPORT_TEMPLATES.map((template) => (
-              <div
-                key={template.id}
-                className="border border-gray-200 rounded-lg p-4 hover:border-blue-300 transition-colors"
-              >
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex items-center">
-                    {getFormatIcon(template.config.format)}
-                    <h4 className="font-medium text-gray-800 ml-2">{template.name}</h4>
-                  </div>
-                  <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded uppercase">
-                    {template.config.format}
-                  </span>
-                </div>
-                
-                <p className="text-sm text-gray-600 mb-3">{template.description}</p>
-                
-                <div className="mb-3">
-                  <p className="text-xs font-medium text-gray-700 mb-1">Use Case:</p>
-                  <p className="text-xs text-gray-600">{template.useCase}</p>
-                </div>
-
-                <div className="mb-4">
-                  <p className="text-xs font-medium text-gray-700 mb-2">Includes:</p>
-                  <div className="flex flex-wrap gap-1">
-                    {template.config.includeSummary && (
-                      <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">Summary</span>
-                    )}
-                    {template.config.includeStateAnalysis && (
-                      <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">States</span>
-                    )}
-                    {template.config.includeRecommendations && (
-                      <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded">Recommendations</span>
-                    )}
-                    {template.config.includeRawData && (
-                      <span className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded">Raw Data</span>
-                    )}
-                    {template.config.sanitizeData && (
-                      <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded">
-                        <Shield className="h-3 w-3 inline mr-1" />
-                        Sanitized
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => handleTemplateExport(template.id)}
-                  disabled={isExporting}
-                  className="w-full flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 transition-colors"
-                >
-                  <Download className="h-4 w-4 mr-2" />
-                  {isExporting ? 'Exporting...' : 'Export'}
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Custom Export Configuration */}
-        {showCustomConfig && (
-          <div className="border border-gray-200 rounded-lg p-6 mb-6">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4">Custom Export Configuration</h3>
-            
-            <div className="grid md:grid-cols-2 gap-6">
-              {/* Format Selection */}
+      {/* Content based on active view */}
+      {activeView === 'overview' && (
+        <div className="space-y-6">
+          {/* Quick Export Section */}
+          <div className="bg-white rounded-lg shadow-md p-6">
+            <div className="flex items-center justify-between mb-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Export Format</label>
-                <div className="space-y-2">
-                  {['excel', 'csv', 'json', 'pdf'].map((format) => (
-                    <label key={format} className="flex items-center">
-                      <input
-                        type="radio"
-                        name="format"
-                        value={format}
-                        checked={customConfig.format === format}
-                        onChange={(e) => setCustomConfig({ ...customConfig, format: e.target.value as any })}
-                        className="mr-2"
-                      />
-                      <div className="flex items-center">
-                        {getFormatIcon(format)}
-                        <span className="ml-2 text-sm text-gray-700 capitalize">{format}</span>
-                      </div>
-                    </label>
-                  ))}
-                </div>
-                <p className="text-xs text-gray-500 mt-2">
-                  {getFormatDescription(customConfig.format)}
+                <h2 className="text-xl font-bold text-gray-800">Quick Export</h2>
+                <p className="text-sm text-gray-600 mt-1">
+                  Export your analysis using pre-configured templates
                 </p>
               </div>
-
-              {/* Content Options */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Include Content</label>
-                <div className="space-y-2">
-                  <label className="flex items-center">
-                    <input
-                      type="checkbox"
-                      checked={customConfig.includeSummary}
-                      onChange={(e) => setCustomConfig({ ...customConfig, includeSummary: e.target.checked })}
-                      className="mr-2"
-                    />
-                    <span className="text-sm text-gray-700">Executive Summary</span>
-                  </label>
-                  
-                  <label className="flex items-center">
-                    <input
-                      type="checkbox"
-                      checked={customConfig.includeStateAnalysis}
-                      onChange={(e) => setCustomConfig({ ...customConfig, includeStateAnalysis: e.target.checked })}
-                      className="mr-2"
-                    />
-                    <span className="text-sm text-gray-700">State-by-State Analysis</span>
-                  </label>
-                  
-                  <label className="flex items-center">
-                    <input
-                      type="checkbox"
-                      checked={customConfig.includeRecommendations}
-                      onChange={(e) => setCustomConfig({ ...customConfig, includeRecommendations: e.target.checked })}
-                      className="mr-2"
-                    />
-                    <span className="text-sm text-gray-700">Compliance Recommendations</span>
-                  </label>
-                  
-                  <label className="flex items-center">
-                    <input
-                      type="checkbox"
-                      checked={customConfig.includeRawData}
-                      onChange={(e) => setCustomConfig({ ...customConfig, includeRawData: e.target.checked })}
-                      className="mr-2"
-                    />
-                    <span className="text-sm text-gray-700">Raw Transaction Data</span>
-                  </label>
-                </div>
-              </div>
-            </div>
-
-            {/* Security Options */}
-            <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-              <div className="flex items-center mb-2">
-                <Shield className="h-5 w-5 text-yellow-600 mr-2" />
-                <h4 className="font-medium text-yellow-800">Data Security Options</h4>
-              </div>
-              
-              <label className="flex items-start">
-                <input
-                  type="checkbox"
-                  checked={customConfig.sanitizeData}
-                  onChange={(e) => setCustomConfig({ ...customConfig, sanitizeData: e.target.checked })}
-                  className="mr-2 mt-1"
-                />
-                <div>
-                  <span className="text-sm font-medium text-yellow-800">Sanitize sensitive data</span>
-                  <p className="text-xs text-yellow-700 mt-1">
-                    Remove specific revenue amounts and transaction counts. Recommended for external sharing.
-                  </p>
-                </div>
-              </label>
-            </div>
-
-            <div className="mt-6 flex justify-end">
               <button
-                onClick={handleCustomExport}
-                disabled={isExporting}
-                className="flex items-center px-6 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:bg-gray-400 transition-colors"
+                onClick={() => setShowExportDialog(true)}
+                className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
               >
                 <Download className="h-4 w-4 mr-2" />
-                {isExporting ? 'Exporting...' : 'Export Custom'}
+                Custom Export
               </button>
             </div>
-          </div>
-        )}
 
-        {/* Export Result */}
-        {exportResult && (
-          <div className={`p-4 rounded-lg border ${
-            exportResult.success 
-              ? 'bg-green-50 border-green-200' 
-              : 'bg-red-50 border-red-200'
-          }`}>
-            <div className="flex items-center">
-              {exportResult.success ? (
-                <CheckCircle className="h-5 w-5 text-green-600 mr-2" />
-              ) : (
-                <AlertCircle className="h-5 w-5 text-red-600 mr-2" />
-              )}
+            <div className="grid md:grid-cols-3 gap-4">
+              {quickExportOptions.map((option) => (
+                <div
+                  key={option.id}
+                  className="border border-gray-200 rounded-lg p-4 hover:border-blue-300 hover:shadow-md transition-all cursor-pointer"
+                  onClick={() => setShowExportDialog(true)}
+                >
+                  <div className="flex items-center mb-3">
+                    {option.icon}
+                    <h3 className="font-medium text-gray-800 ml-2">{option.name}</h3>
+                  </div>
+                  
+                  <p className="text-sm text-gray-600 mb-2">{option.description}</p>
+                  
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded uppercase">
+                      {option.format}
+                    </span>
+                    <Download className="h-4 w-4 text-gray-400" />
+                  </div>
+                  
+                  <p className="text-xs text-gray-500 mt-2">{option.useCase}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Sharing Recommendations */}
+          <div className="bg-white rounded-lg shadow-md p-6">
+            <div className="flex items-center mb-6">
+              <Share2 className="h-5 w-5 text-blue-600 mr-2" />
+              <h2 className="text-xl font-bold text-gray-800">Sharing Recommendations</h2>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-4">
+              {sharingRecommendations.map((rec, index) => (
+                <div key={index} className="border border-gray-200 rounded-lg p-4">
+                  <div className="flex items-center mb-3">
+                    {rec.icon}
+                    <h3 className="font-medium text-gray-800 ml-2">{rec.audience}</h3>
+                  </div>
+                  
+                  <p className="text-sm text-gray-600 mb-2">{rec.recommendation}</p>
+                  
+                  <div className="flex items-center text-xs text-gray-500">
+                    <Shield className="h-3 w-3 mr-1" />
+                    {rec.security}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Export Guidelines */}
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+            <h3 className="text-lg font-medium text-blue-800 mb-4">Export Guidelines</h3>
+            <div className="grid md:grid-cols-2 gap-6">
               <div>
-                <p className={`font-medium ${
-                  exportResult.success ? 'text-green-800' : 'text-red-800'
-                }`}>
-                  {exportResult.success ? 'Export Successful' : 'Export Failed'}
-                </p>
-                {exportResult.success ? (
-                  <p className="text-sm text-green-700 mt-1">
-                    Downloaded: {exportResult.filename} ({(exportResult.size / 1024).toFixed(1)} KB)
-                  </p>
-                ) : (
-                  <p className="text-sm text-red-700 mt-1">
-                    {exportResult.error}
-                  </p>
-                )}
+                <h4 className="font-medium text-blue-800 mb-2">Best Practices</h4>
+                <ul className="text-sm text-blue-700 space-y-1">
+                  <li>• Use sanitized exports when sharing externally</li>
+                  <li>• Excel format provides the most comprehensive analysis</li>
+                  <li>• PDF format is ideal for executive presentations</li>
+                  <li>• JSON format works well for system integration</li>
+                </ul>
+              </div>
+              
+              <div>
+                <h4 className="font-medium text-blue-800 mb-2">Security Considerations</h4>
+                <ul className="text-sm text-blue-700 space-y-1">
+                  <li>• Enable data sanitization for external sharing</li>
+                  <li>• Review export contents before distribution</li>
+                  <li>• Consider audience when selecting export format</li>
+                  <li>• All exports include metadata about configuration</li>
+                </ul>
               </div>
             </div>
           </div>
-        )}
-
-        {/* Export Instructions */}
-        <div className="mt-8 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-          <div className="flex items-start">
-            <Info className="h-5 w-5 text-blue-600 mr-2 mt-0.5" />
-            <div>
-              <h4 className="font-medium text-blue-800 mb-2">Export Guidelines</h4>
-              <ul className="text-sm text-blue-700 space-y-1">
-                <li>• <strong>Excel format</strong> provides the most comprehensive analysis with multiple worksheets</li>
-                <li>• <strong>CSV format</strong> is ideal for importing into other analysis tools</li>
-                <li>• <strong>JSON format</strong> is perfect for system integration and automated processing</li>
-                <li>• <strong>PDF format</strong> creates professional reports for presentations and documentation</li>
-                <li>• Use <strong>sanitized exports</strong> when sharing data externally to protect sensitive information</li>
-                <li>• All exports include metadata about the analysis configuration and export settings</li>
-              </ul>
-            </div>
-          </div>
         </div>
-      </div>
+      )}
+
+      {activeView === 'history' && (
+        <ExportHistory />
+      )}
+
+      {activeView === 'templates' && (
+        <ExportTemplateManager
+          onTemplateSelect={(template) => {
+            // Handle template selection
+            setShowExportDialog(true);
+          }}
+        />
+      )}
+
+      {/* Export Dialog */}
+      {showExportDialog && (
+        <ExportDialog
+          isOpen={showExportDialog}
+          onClose={() => setShowExportDialog(false)}
+          data={data}
+          onExportComplete={handleExportComplete}
+        />
+      )}
     </div>
   );
 };
