@@ -4,6 +4,7 @@ import { calculateNexus } from './nexusCalculator';
 import { calculateTaxLiability } from './taxCalculator';
 import { determineStateThresholds } from '../constants/stateThresholds';
 import { getStateTaxRate } from '../constants/taxRates';
+import { detectColumns, transformDataWithMapping, validateDetection, generateDetectionReport } from './columnDetection';
 import * as XLSX from 'xlsx';
 
 // Progress callback type
@@ -89,18 +90,41 @@ export const processCSVData = async (
       const sheetData = XLSX.utils.sheet_to_json(worksheet, { raw: false });
       combinedData.push(...sheetData);
     });
+    if (onProgress) onProgress(25);
+
+    // Extract raw headers from the first row
+    if (combinedData.length === 0) {
+      throw new Error('CSV file is empty');
+    }
+    
+    const rawHeaders = Object.keys(combinedData[0]);
     if (onProgress) onProgress(30);
 
-    // Validate the raw data immediately after reading
-    validateCSV(combinedData);
+    // Detect column mappings using smart detection
+    const detectionResult = detectColumns(rawHeaders);
+    const validationResult = validateDetection(detectionResult);
+    
+    if (!validationResult.isValid) {
+      const report = generateDetectionReport(detectionResult);
+      throw new Error(`Column detection failed:\n\n${report}\n\nErrors:\n${validationResult.errors.join('\n')}`);
+    }
+    
+    if (onProgress) onProgress(35);
+
+    // Transform data using detected column mapping
+    const transformedData = transformDataWithMapping(combinedData, detectionResult.mapping);
     if (onProgress) onProgress(40);
+
+    // Validate the transformed data
+    validateCSV(transformedData);
+    if (onProgress) onProgress(45);
 
     // Process dates in batches
     const batchSize = 1000;
     const processedData: any[] = [];
     
     await processBatch(
-      combinedData,
+      transformedData,
       batchSize,
       (batch) => {
         const processed = batch.map(row => ({
@@ -110,17 +134,17 @@ export const processCSVData = async (
         processedData.push(...processed);
       },
       (batchProgress) => {
-        if (onProgress) onProgress(40 + Math.floor(batchProgress * 0.2));
+        if (onProgress) onProgress(45 + Math.floor(batchProgress * 0.25));
       }
     );
     
     // Process the data to determine nexus by year
     const salesByState = aggregateSalesByState(processedData);
-    if (onProgress) onProgress(70);
+    if (onProgress) onProgress(75);
     
     // Calculate nexus for each state based on annual thresholds
     const nexusStates = determineNexusStates(salesByState);
-    if (onProgress) onProgress(80);
+    if (onProgress) onProgress(85);
     
     // Calculate tax liability
     const statesWithLiability = calculateTaxLiabilities(nexusStates);
@@ -178,7 +202,8 @@ export const processCSVData = async (
         revenueThreshold: thresholds.revenue,
         transactionThreshold: thresholds.transactions,
         thresholdProximity,
-        taxRate: Number(taxRate.toFixed(2))
+        taxRate: Number(taxRate.toFixed(2)),
+        annualData: {}
       };
     });
 
@@ -328,7 +353,8 @@ const determineNexusStates = (salesByState: StateSales): NexusState[] => {
         liability: 0,
         preNexusRevenue: 0,
         postNexusRevenue: 0,
-        effectiveDate: earliestNexusDate
+        effectiveDate: earliestNexusDate,
+        annualData: {}
       });
     }
   });
