@@ -9,11 +9,13 @@ import { YearSelectionProvider } from './context/YearSelectionContext';
 import { ProgressProvider } from './context/ProgressContext';
 import YearToggleBar from './components/YearToggleBar';
 import EnhancedProgressIndicator from './components/EnhancedProgressIndicator';
+import NexusAnalysisDemo from './components/NexusAnalysisDemo';
 
 function App() {
   const [processedData, setProcessedData] = useState<ProcessedData | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showNexusDemo, setShowNexusDemo] = useState(false);
 
   const handleFileUpload = async (file: File) => {
     try {
@@ -44,6 +46,20 @@ function App() {
                   Upload your sales data to analyze State and Local Tax (SALT) nexus obligations and 
                   generate comprehensive compliance reports.
                 </p>
+                <div className="mt-4 flex justify-center space-x-4">
+                  <button 
+                    onClick={() => setShowNexusDemo(false)}
+                    className={`px-4 py-2 rounded-md ${!showNexusDemo ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`}
+                  >
+                    File Upload
+                  </button>
+                  <button 
+                    onClick={() => setShowNexusDemo(true)}
+                    className={`px-4 py-2 rounded-md ${showNexusDemo ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`}
+                  >
+                    Nexus Analysis Demo
+                  </button>
+                </div>
               </div>
               
               {/* Enhanced Progress Indicator */}
@@ -56,11 +72,15 @@ function App() {
                 </div>
               )}
               
-              <FileUpload 
-                onFileUpload={handleFileUpload} 
-                isProcessing={isProcessing}
-                error={error}
-              />
+              {showNexusDemo ? (
+                <NexusAnalysisDemo />
+              ) : (
+                <FileUpload 
+                  onFileUpload={handleFileUpload} 
+                  isProcessing={isProcessing}
+                  error={error}
+                />
+              )}
               <Disclaimer className="mt-8" />
             </div>
           ) : (

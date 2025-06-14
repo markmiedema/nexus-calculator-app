@@ -1,4 +1,5 @@
 // Enhanced column detection with fuzzy matching and confidence scoring
+import { detectColumnMappings } from './nexusEngine/columnMappings';
 
 export interface ColumnMapping {
   [standardName: string]: string[];
@@ -16,6 +17,7 @@ export const COLUMN_MAPPINGS: ColumnMapping = {
   date: [
     'date',
     'transaction_date',
+    'Transaction_Date',
     'transaction date',
     'transaction_id_date',
     'transaction id date',
@@ -41,6 +43,8 @@ export const COLUMN_MAPPINGS: ColumnMapping = {
   state: [
     'state',
     'state_code',
+    'ShipTo_State',
+    'BillTo_State',
     'state code',
     'st',
     'province',
@@ -70,6 +74,7 @@ export const COLUMN_MAPPINGS: ColumnMapping = {
     'amount',
     'total',
     'total_amount',
+    'Extended_Amount',
     'total amount',
     'revenue',
     'sales',
@@ -98,6 +103,7 @@ export const COLUMN_MAPPINGS: ColumnMapping = {
     'transaction count',
     'transactions',
     'quantity',
+    'Quantity',
     'qty',
     'units',
     'items',
@@ -181,6 +187,7 @@ export const COLUMN_MAPPINGS: ColumnMapping = {
   // New fields for additional headers
   transaction_id: [
     'transaction_id',
+    'Transaction_ID',
     'transaction id',
     'trans_id',
     'order_id',
@@ -194,6 +201,7 @@ export const COLUMN_MAPPINGS: ColumnMapping = {
   ],
   revenue_type: [
     'revenue_type',
+    'Revenue_Type',
     'revenue type',
     'sales_type',
     'sales type',
@@ -204,6 +212,7 @@ export const COLUMN_MAPPINGS: ColumnMapping = {
   ],
   product_category: [
     'product_category',
+    'Product_Category',
     'product category',
     'category',
     'product_type',
@@ -213,6 +222,7 @@ export const COLUMN_MAPPINGS: ColumnMapping = {
   ],
   marketplace_facilitator: [
     'marketplace_facilitator_flag',
+    'Marketplace_Facilitator_Flag',
     'marketplace facilitator flag',
     'marketplace_facilitator',
     'marketplace facilitator',
@@ -223,6 +233,7 @@ export const COLUMN_MAPPINGS: ColumnMapping = {
   ],
   customer_type: [
     'customer_type',
+    'Customer_Type',
     'customer type',
     'buyer_type',
     'buyer type',
@@ -231,6 +242,7 @@ export const COLUMN_MAPPINGS: ColumnMapping = {
   ],
   exemption_certificate: [
     'exemption_certificate_id',
+    'Exemption_Certificate_ID',
     'exemption certificate id',
     'exemption_id',
     'exemption id',

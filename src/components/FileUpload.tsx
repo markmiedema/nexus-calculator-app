@@ -11,6 +11,7 @@ import { useChunkedProcessing } from '../hooks/useChunkedProcessing';
 import { isWebWorkerSupported } from '../utils/workerFallback';
 import { calculateOptimalChunkSize } from '../utils/chunkProcessor';
 import * as XLSX from 'xlsx';
+import { detectColumnMappings } from '../utils/nexusEngine/columnMappings';
 
 interface FileUploadProps {
   onFileUpload: (file: File) => void;
@@ -26,6 +27,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload, isProcessing, err
   const [showPreview, setShowPreview] = useState(false);
   const [processingStrategy, setProcessingStrategy] = useState<'chunked' | 'worker' | 'fallback'>('fallback');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [parsedData, setParsedData] = useState<any[]>([]);
 
   // Web Worker hook for background processing
   const {
@@ -146,11 +148,17 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload, isProcessing, err
         });
       }
       
+      setParsedData(data);
       setUploadProgress(60);
       
       // Determine optimal processing strategy
       const strategy = determineProcessingStrategy(data.length);
       setProcessingStrategy(strategy);
+      
+      // Try to detect columns using the nexus engine's column mappings
+      const headers = Object.keys(data[0] || {});
+      const mappings = detectColumnMappings(headers);
+      console.log('Detected column mappings:', mappings);
       
       // Validate with smart detection
       const result = validateCSVWithSmartDetection(data);
@@ -162,6 +170,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload, isProcessing, err
       
       setUploadProgress(100);
     } catch (err) {
+      console.error('Error validating file:', err);
       setValidationResult({
         isValid: false,
         errors: [err instanceof Error ? err.message : 'Failed to process file'],
@@ -309,7 +318,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload, isProcessing, err
               {selectedFile && validationResult?.isValid && (
                 <div className="flex items-center space-x-2 px-3 py-1 bg-gray-50 rounded-md">
                   {(() => {
-                    const strategyInfo = getProcessingStrategyInfo(processingStrategy, 0);
+                    const strategyInfo = getProcessingStrategyInfo(processingStrategy, parsedData.length);
                     return (
                       <>
                         {strategyInfo.icon}
@@ -414,7 +423,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload, isProcessing, err
               {validationResult?.isValid && (
                 <div className="p-3 bg-blue-50 rounded-md">
                   {(() => {
-                    const strategyInfo = getProcessingStrategyInfo(processingStrategy, 0);
+                    const strategyInfo = getProcessingStrategyInfo(processingStrategy, parsedData.length);
                     return (
                       <div className="flex items-start space-x-2">
                         {strategyInfo.icon}
