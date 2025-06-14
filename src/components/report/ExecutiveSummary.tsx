@@ -160,7 +160,7 @@ const ExecutiveSummary: React.FC<ExecutiveSummaryProps> = ({ data }) => {
             <div className="bg-green-50 rounded-lg p-4 border border-green-100">
               <div className="flex items-center mb-3">
                 <CheckCircle className="h-5 w-5 text-green-600 mr-2" />
-                <h3 className="font-medium text-green-800">Safe Zone (<50%)</h3>
+                <h3 className="font-medium text-green-800">Safe Zone {"<50%"}</h3>
               </div>
               <div className="space-y-2">
                 {safeStates.length > 0 ? (
