@@ -543,9 +543,9 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload, isProcessing, err
               <strong>Smart Processing:</strong> Our system automatically chooses the best processing method based on your file size:
             </p>
             <ul className="mt-2 text-xs text-blue-600 space-y-1">
-              <li>• <strong>Small files (<1K rows):</strong> Fast main-thread processing</li>
+              <li>• <strong>Small files (&lt;1K rows):</strong> Fast main-thread processing</li>
               <li>• <strong>Medium files (1K-5K rows):</strong> Background Web Worker processing</li>
-              <li>• <strong>Large files (>5K rows):</strong> Chunked parallel processing with worker pool</li>
+              <li>• <strong>Large files (&gt;5K rows):</strong> Chunked parallel processing with worker pool</li>
             </ul>
           </div>
         </div>
