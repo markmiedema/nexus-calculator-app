@@ -75,6 +75,15 @@ export interface NexusState {
       liability: number;
     };
   };
+  yearlyBreaches?: {
+    [year: string]: {
+      hasNexus: boolean;
+      nexusDate: string | null;
+      thresholdType: 'revenue' | 'transactions' | null;
+      revenue: number;
+      transactions: number;
+    }
+  };
 }
 
 // Year selection context

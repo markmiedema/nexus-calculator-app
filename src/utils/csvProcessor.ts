@@ -575,44 +575,34 @@ const determineNexusStates = (salesByState: StateSales): NexusState[] => {
   const nexusStates: NexusState[] = [];
   
   Object.entries(salesByState).forEach(([stateCode, data]) => {
-    const thresholds = determineStateThresholds(stateCode);
-    let earliestNexusDate: string | null = null;
-    let nexusTriggeredBy: 'revenue' | 'transactions' = 'revenue';
+    // Calculate nexus for this state
+    const nexusResult = calculateNexus(
+      stateCode,
+      data.totalRevenue,
+      data.transactionCount,
+      data.monthlyRevenue
+    );
     
-    // Check each year for nexus
-    Object.entries(data.annualSales).forEach(([year, yearData]) => {
-      const hasRevenueNexus = yearData.totalRevenue >= thresholds.revenue;
-      const hasTransactionNexus = thresholds.transactions !== null && 
-        yearData.transactionCount >= thresholds.transactions;
-      
-      if (hasRevenueNexus || hasTransactionNexus) {
-        const nexusDate = yearData.firstTransactionDate;
-        if (!earliestNexusDate || nexusDate < earliestNexusDate) {
-          earliestNexusDate = nexusDate;
-          nexusTriggeredBy = hasRevenueNexus ? 'revenue' : 'transactions';
-        }
-      }
-    });
-    
-    if (earliestNexusDate) {
+    if (nexusResult.hasNexus && nexusResult.nexusDate) {
       nexusStates.push({
         code: stateCode,
         name: getStateName(stateCode),
         totalRevenue: data.totalRevenue,
         transactionCount: data.transactionCount,
         monthlyRevenue: data.monthlyRevenue,
-        nexusDate: earliestNexusDate,
-        thresholdTriggered: nexusTriggeredBy,
-        revenueThreshold: thresholds.revenue,
-        transactionThreshold: thresholds.transactions,
-        registrationDeadline: calculateRegistrationDeadline(earliestNexusDate),
+        nexusDate: nexusResult.nexusDate,
+        thresholdTriggered: nexusResult.thresholdType || 'revenue',
+        revenueThreshold: determineStateThresholds(stateCode).revenue,
+        transactionThreshold: determineStateThresholds(stateCode).transactions,
+        registrationDeadline: calculateRegistrationDeadline(nexusResult.nexusDate),
         filingFrequency: determineFilingFrequency(data.totalRevenue),
         taxRate: 0,
         liability: 0,
-        preNexusRevenue: 0,
-        postNexusRevenue: 0,
-        effectiveDate: earliestNexusDate,
-        annualData: {}
+        preNexusRevenue: nexusResult.preNexusRevenue,
+        postNexusRevenue: nexusResult.postNexusRevenue,
+        effectiveDate: nexusResult.nexusDate,
+        annualData: {},
+        yearlyBreaches: nexusResult.yearlyBreaches
       });
     }
   });
