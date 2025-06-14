@@ -300,7 +300,8 @@ export const calculateSimilarity = (header: string, target: string): number => {
   
   // Substring matching bonus
   if (normalizedHeader.includes(normalizedTarget) || normalizedTarget.includes(normalizedHeader)) {
-    return Math.max(70, (matchingChars / maxLength) * 100 + 20);
+    // Fix: Cap the similarity score at 100 to prevent scores over 100%
+    return Math.min(100, Math.max(70, (matchingChars / maxLength) * 100 + 20));
   }
   
   // Basic character similarity
