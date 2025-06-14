@@ -529,9 +529,12 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload, isProcessing, err
               <h4 className="font-medium text-gray-700 mb-2">Optional Columns:</h4>
               <ul className="space-y-1 list-disc pl-5">
                 <li><strong>Quantity:</strong> transaction_count, qty, units, etc.</li>
-                <li><strong>City:</strong> city, customer_city, billing_city, etc.</li>
-                <li><strong>County:</strong> county, customer_county, billing_county, etc.</li>
-                <li><strong>Zip Code:</strong> zip_code, zip, postal_code, etc.</li>
+                <li><strong>Transaction ID:</strong> transaction_id, order_id, etc.</li>
+                <li><strong>Revenue Type:</strong> revenue_type, sales_type, etc.</li>
+                <li><strong>Product Category:</strong> product_category, category, etc.</li>
+                <li><strong>Marketplace Flag:</strong> marketplace_facilitator_flag, etc.</li>
+                <li><strong>Customer Type:</strong> customer_type, buyer_type, etc.</li>
+                <li><strong>Exemption Certificate:</strong> exemption_certificate_id, etc.</li>
               </ul>
             </div>
           </div>
@@ -540,9 +543,9 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload, isProcessing, err
               <strong>Smart Processing:</strong> Our system automatically chooses the best processing method based on your file size:
             </p>
             <ul className="mt-2 text-xs text-blue-600 space-y-1">
-              <li>• <strong>Small files (&lt;1K rows):</strong> Fast main-thread processing</li>
+              <li>• <strong>Small files (<1K rows):</strong> Fast main-thread processing</li>
               <li>• <strong>Medium files (1K-5K rows):</strong> Background Web Worker processing</li>
-              <li>• <strong>Large files (&gt;5K rows):</strong> Chunked parallel processing with worker pool</li>
+              <li>• <strong>Large files (>5K rows):</strong> Chunked parallel processing with worker pool</li>
             </ul>
           </div>
         </div>

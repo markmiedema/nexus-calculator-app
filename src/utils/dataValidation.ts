@@ -230,7 +230,7 @@ const validateDataQuality = (data: CSVRow[], detectionResult: DetectionResult): 
 
 // Generate column mapping preview for user interface
 export const generateColumnMappingPreview = (detectionResult: DetectionResult): ColumnMappingPreviewData => {
-  const { mapping, confidence } = detectionResult;
+  const { mapping, confidence, unmappedHeaders } = detectionResult;
   const requiredColumns = ['date', 'state', 'sale_amount'];
   
   const detectedMappings = Object.entries(mapping).map(([standardColumn, detectedHeader]) => {
@@ -267,7 +267,7 @@ export const generateColumnMappingPreview = (detectionResult: DetectionResult): 
 
   return {
     detectedMappings,
-    unmappedHeaders: detectionResult.unmappedHeaders,
+    unmappedHeaders,
     overallConfidence,
     canProceed
   };
@@ -275,13 +275,18 @@ export const generateColumnMappingPreview = (detectionResult: DetectionResult): 
 
 // Generate CSV template for download
 export const generateCSVTemplate = (): string => {
-  const headers = ['date', 'state', 'sale_amount', 'transaction_count', 'city', 'county', 'zip_code'];
+  const headers = [
+    'date', 'state', 'sale_amount', 'transaction_count', 'city', 'county', 'zip_code',
+    'transaction_id', 'revenue_type', 'product_category', 'marketplace_facilitator_flag',
+    'customer_type', 'exemption_certificate_id'
+  ];
+  
   const sampleData = [
-    ['2024-01-15', 'CA', '1500.00', '1', 'Los Angeles', 'Los Angeles County', '90210'],
-    ['2024-01-16', 'TX', '2500.00', '2', 'Houston', 'Harris County', '77001'],
-    ['2024-01-17', 'NY', '3000.00', '1', 'New York', 'New York County', '10001'],
-    ['2024-01-18', 'FL', '1200.00', '1', 'Miami', 'Miami-Dade County', '33101'],
-    ['2024-01-19', 'WA', '1800.00', '3', 'Seattle', 'King County', '98101']
+    ['2024-01-15', 'CA', '1500.00', '1', 'Los Angeles', 'Los Angeles County', '90210', 'TX-001', 'Product', 'Electronics', 'N', 'Retail', 'EC-12345'],
+    ['2024-01-16', 'TX', '2500.00', '2', 'Houston', 'Harris County', '77001', 'TX-002', 'Service', 'Software', 'N', 'Business', 'EC-23456'],
+    ['2024-01-17', 'NY', '3000.00', '1', 'New York', 'New York County', '10001', 'TX-003', 'Product', 'Apparel', 'Y', 'Retail', ''],
+    ['2024-01-18', 'FL', '1200.00', '1', 'Miami', 'Miami-Dade County', '33101', 'TX-004', 'Digital', 'Media', 'Y', 'Consumer', ''],
+    ['2024-01-19', 'WA', '1800.00', '3', 'Seattle', 'King County', '98101', 'TX-005', 'Product', 'Home Goods', 'N', 'Retail', 'EC-34567']
   ];
 
   const csvContent = [
@@ -359,7 +364,13 @@ const getColumnVariations = (standardColumn: string): string[] => {
     transaction_count: ['transaction_count', 'quantity', 'qty', 'count'],
     city: ['city', 'customer_city', 'billing_city', 'shipping_city'],
     county: ['county', 'customer_county', 'billing_county', 'shipping_county'],
-    zip_code: ['zip_code', 'zip', 'postal_code', 'zipcode']
+    zip_code: ['zip_code', 'zip', 'postal_code', 'zipcode'],
+    transaction_id: ['transaction_id', 'order_id', 'invoice_id'],
+    revenue_type: ['revenue_type', 'sales_type', 'transaction_type'],
+    product_category: ['product_category', 'category', 'product_type'],
+    marketplace_facilitator: ['marketplace_facilitator_flag', 'marketplace_flag'],
+    customer_type: ['customer_type', 'buyer_type', 'client_type'],
+    exemption_certificate: ['exemption_certificate_id', 'exemption_id', 'certificate_id']
   };
   
   return variations[standardColumn] || [];

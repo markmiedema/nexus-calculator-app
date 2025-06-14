@@ -49,6 +49,10 @@ const ColumnMappingPreview: React.FC<ColumnMappingPreviewProps> = ({
     return 'text-red-600';
   };
 
+  // Group mappings by required vs optional
+  const requiredMappings = detectedMappings.filter(m => m.isRequired);
+  const optionalMappings = detectedMappings.filter(m => !m.isRequired);
+
   return (
     <div className="bg-white rounded-lg shadow-md p-6">
       <div className="flex items-center justify-between mb-6">
@@ -66,62 +70,117 @@ const ColumnMappingPreview: React.FC<ColumnMappingPreviewProps> = ({
         </div>
       </div>
 
-      {/* Column Mappings Table */}
-      <div className="overflow-hidden border border-gray-200 rounded-lg mb-6">
-        <table className="w-full">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Standard Column
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Detected Header
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Confidence
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Status
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {detectedMappings.map((mapping) => (
-              <tr key={mapping.standardColumn} className="hover:bg-gray-50">
-                <td className="px-4 py-3">
-                  <div className="flex items-center">
-                    <span className="font-medium text-gray-900">
-                      {mapping.standardColumn.replace('_', ' ')}
-                    </span>
-                    {mapping.isRequired && (
+      {/* Required Columns Section */}
+      <div className="mb-6">
+        <h4 className="text-sm font-medium text-gray-700 mb-2">Required Columns</h4>
+        <div className="overflow-hidden border border-gray-200 rounded-lg">
+          <table className="w-full">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Standard Column
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Detected Header
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Confidence
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Status
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {requiredMappings.map((mapping) => (
+                <tr key={mapping.standardColumn} className="hover:bg-gray-50">
+                  <td className="px-4 py-3">
+                    <div className="flex items-center">
+                      <span className="font-medium text-gray-900">
+                        {mapping.standardColumn.replace('_', ' ')}
+                      </span>
                       <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
                         Required
                       </span>
-                    )}
-                  </div>
-                </td>
-                <td className="px-4 py-3">
-                  <span className="text-gray-900">
-                    {mapping.detectedHeader || 'Not detected'}
-                  </span>
-                </td>
-                <td className="px-4 py-3">
-                  <span className={`font-medium ${getConfidenceColor(mapping.confidence)}`}>
-                    {mapping.confidence > 0 ? `${mapping.confidence.toFixed(1)}%` : '-'}
-                  </span>
-                </td>
-                <td className="px-4 py-3">
-                  <div className="flex items-center">
-                    {getStatusIcon(mapping.status)}
-                    <span className="ml-2 text-sm text-gray-700 capitalize">
-                      {mapping.status.replace('_', ' ')}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className="text-gray-900">
+                      {mapping.detectedHeader || 'Not detected'}
                     </span>
-                  </div>
-                </td>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className={`font-medium ${getConfidenceColor(mapping.confidence)}`}>
+                      {mapping.confidence > 0 ? `${mapping.confidence.toFixed(1)}%` : '-'}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center">
+                      {getStatusIcon(mapping.status)}
+                      <span className="ml-2 text-sm text-gray-700 capitalize">
+                        {mapping.status.replace('_', ' ')}
+                      </span>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Optional Columns Section */}
+      <div className="mb-6">
+        <h4 className="text-sm font-medium text-gray-700 mb-2">Optional Columns</h4>
+        <div className="overflow-hidden border border-gray-200 rounded-lg">
+          <table className="w-full">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Standard Column
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Detected Header
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Confidence
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Status
+                </th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {optionalMappings.map((mapping) => (
+                <tr key={mapping.standardColumn} className="hover:bg-gray-50">
+                  <td className="px-4 py-3">
+                    <span className="font-medium text-gray-900">
+                      {mapping.standardColumn.replace('_', ' ')}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className="text-gray-900">
+                      {mapping.detectedHeader || 'Not detected'}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className={`font-medium ${getConfidenceColor(mapping.confidence)}`}>
+                      {mapping.confidence > 0 ? `${mapping.confidence.toFixed(1)}%` : '-'}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center">
+                      {getStatusIcon(mapping.status)}
+                      <span className="ml-2 text-sm text-gray-700 capitalize">
+                        {mapping.status.replace('_', ' ')}
+                      </span>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* Unmapped Headers */}

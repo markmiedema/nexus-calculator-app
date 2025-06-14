@@ -17,6 +17,8 @@ export const COLUMN_MAPPINGS: ColumnMapping = {
     'date',
     'transaction_date',
     'transaction date',
+    'transaction_id_date',
+    'transaction id date',
     'sale_date',
     'sale date',
     'order_date',
@@ -33,7 +35,8 @@ export const COLUMN_MAPPINGS: ColumnMapping = {
     'purchase_date',
     'purchase date',
     'billing_date',
-    'billing date'
+    'billing date',
+    'transaction_date' // Exact match for Transaction_Date
   ],
   state: [
     'state',
@@ -44,10 +47,12 @@ export const COLUMN_MAPPINGS: ColumnMapping = {
     'region',
     'ship_to_state',
     'ship to state',
+    'shipto_state',
     'shipping_state',
     'shipping state',
     'bill_to_state',
     'bill to state',
+    'billto_state',
     'billing_state',
     'billing state',
     'customer_state',
@@ -55,7 +60,9 @@ export const COLUMN_MAPPINGS: ColumnMapping = {
     'destination_state',
     'destination state',
     'delivery_state',
-    'delivery state'
+    'delivery state',
+    'shipto_state', // Exact match for ShipTo_State
+    'billto_state'  // Exact match for BillTo_State
   ],
   sale_amount: [
     'sale_amount',
@@ -83,7 +90,8 @@ export const COLUMN_MAPPINGS: ColumnMapping = {
     'line total',
     'extended_price',
     'extended price',
-    'sales amount ($)'
+    'sales amount ($)',
+    'extended_amount' // Exact match for Extended_Amount
   ],
   transaction_count: [
     'transaction_count',
@@ -105,7 +113,8 @@ export const COLUMN_MAPPINGS: ColumnMapping = {
     'num_transactions',
     'trans_count',
     'item_count',
-    'product_count'
+    'product_count',
+    'quantity' // Exact match for Quantity
   ],
   city: [
     'city',
@@ -168,6 +177,67 @@ export const COLUMN_MAPPINGS: ColumnMapping = {
     'destination zip',
     'delivery_zip',
     'delivery zip'
+  ],
+  // New fields for additional headers
+  transaction_id: [
+    'transaction_id',
+    'transaction id',
+    'trans_id',
+    'order_id',
+    'order id',
+    'invoice_id',
+    'invoice id',
+    'id',
+    'reference',
+    'reference_id',
+    'reference id'
+  ],
+  revenue_type: [
+    'revenue_type',
+    'revenue type',
+    'sales_type',
+    'sales type',
+    'transaction_type',
+    'transaction type',
+    'order_type',
+    'order type'
+  ],
+  product_category: [
+    'product_category',
+    'product category',
+    'category',
+    'product_type',
+    'product type',
+    'item_category',
+    'item category'
+  ],
+  marketplace_facilitator: [
+    'marketplace_facilitator_flag',
+    'marketplace facilitator flag',
+    'marketplace_facilitator',
+    'marketplace facilitator',
+    'marketplace_flag',
+    'marketplace flag',
+    'facilitator_flag',
+    'facilitator flag'
+  ],
+  customer_type: [
+    'customer_type',
+    'customer type',
+    'buyer_type',
+    'buyer type',
+    'client_type',
+    'client type'
+  ],
+  exemption_certificate: [
+    'exemption_certificate_id',
+    'exemption certificate id',
+    'exemption_id',
+    'exemption id',
+    'certificate_id',
+    'certificate id',
+    'tax_exempt_id',
+    'tax exempt id'
   ]
 };
 
@@ -240,7 +310,13 @@ export const detectColumns = (rawHeaders: string[]): DetectionResult => {
     'county',        // Detect county before transaction_count
     'city',
     'zip_code',
-    'transaction_count'  // Detect transaction_count last
+    'transaction_count',  // Detect transaction_count last
+    'transaction_id',
+    'revenue_type',
+    'product_category',
+    'marketplace_facilitator',
+    'customer_type',
+    'exemption_certificate'
   ];
   
   // For each standard column in priority order, find the best match
