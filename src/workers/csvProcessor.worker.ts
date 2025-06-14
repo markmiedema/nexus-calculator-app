@@ -473,8 +473,26 @@ const determineNexusStates = (salesByState: any) => {
     });
     
     if (earliestNexusDate) {
+      // Calculate post-nexus revenue
+      let postNexusRevenue = 0;
+      let preNexusRevenue = 0;
+      
+      // Sort monthly revenue data by date
+      const sortedMonthlyData = [...data.monthlyRevenue].sort(
+        (a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime()
+      );
+      
+      // Calculate pre and post nexus revenue
+      for (const month of sortedMonthlyData) {
+        if (month.date >= earliestNexusDate) {
+          postNexusRevenue += month.revenue;
+        } else {
+          preNexusRevenue += month.revenue;
+        }
+      }
+      
       const taxRate = STATE_TAX_RATES[stateCode] || 0;
-      const liability = Math.round(data.totalRevenue * (taxRate / 100));
+      const liability = Math.round(postNexusRevenue * (taxRate / 100));
       
       nexusStates.push({
         code: stateCode,
@@ -490,8 +508,8 @@ const determineNexusStates = (salesByState: any) => {
         filingFrequency: determineFilingFrequency(data.totalRevenue),
         taxRate: Number(taxRate.toFixed(2)),
         liability,
-        preNexusRevenue: 0,
-        postNexusRevenue: data.totalRevenue,
+        preNexusRevenue,
+        postNexusRevenue,
         effectiveDate: earliestNexusDate,
         annualData: {}
       });
