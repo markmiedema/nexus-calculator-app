@@ -575,7 +575,7 @@ const determineNexusStates = (salesByState: StateSales): NexusState[] => {
   const nexusStates: NexusState[] = [];
   
   Object.entries(salesByState).forEach(([stateCode, data]) => {
-    // Calculate nexus for this state
+    // Calculate nexus for this state using the updated per-year API
     const nexusResult = calculateNexus(
       stateCode,
       data.totalRevenue,
@@ -584,6 +584,10 @@ const determineNexusStates = (salesByState: StateSales): NexusState[] => {
     );
     
     if (nexusResult.hasNexus && nexusResult.nexusDate) {
+      // Calculate pre-nexus and post-nexus revenue
+      let preNexusRevenue = nexusResult.preNexusRevenue;
+      let postNexusRevenue = nexusResult.postNexusRevenue;
+      
       nexusStates.push({
         code: stateCode,
         name: getStateName(stateCode),
@@ -598,8 +602,8 @@ const determineNexusStates = (salesByState: StateSales): NexusState[] => {
         filingFrequency: determineFilingFrequency(data.totalRevenue),
         taxRate: 0,
         liability: 0,
-        preNexusRevenue: nexusResult.preNexusRevenue,
-        postNexusRevenue: nexusResult.postNexusRevenue,
+        preNexusRevenue: preNexusRevenue,
+        postNexusRevenue: postNexusRevenue,
         effectiveDate: nexusResult.nexusDate,
         annualData: {},
         yearlyBreaches: nexusResult.yearlyBreaches

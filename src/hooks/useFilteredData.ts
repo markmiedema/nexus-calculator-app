@@ -64,19 +64,41 @@ export const useFilteredData = (originalData: ProcessedData): ProcessedData => {
         let runningRevenue = 0;
         let runningTransactions = 0;
         let nexusDate = '';
+        let thresholdTriggered: 'revenue' | 'transactions' = 'revenue';
 
-        for (const month of state.monthlyRevenue) {
+        // Sort monthly revenue by date
+        const sortedMonthlyRevenue = [...state.monthlyRevenue].sort(
+          (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+        );
+
+        for (const month of sortedMonthlyRevenue) {
           runningRevenue += month.revenue;
           runningTransactions += month.transactions;
 
-          if (runningRevenue >= state.revenueThreshold ||
-              (state.transactionThreshold && runningTransactions >= state.transactionThreshold)) {
+          if (runningRevenue >= state.revenueThreshold) {
             nexusDate = month.date;
+            thresholdTriggered = 'revenue';
+            break;
+          } else if (state.transactionThreshold && runningTransactions >= state.transactionThreshold) {
+            nexusDate = month.date;
+            thresholdTriggered = 'transactions';
             break;
           }
         }
 
         if (nexusDate) {
+          // Calculate pre and post nexus revenue
+          let preNexusRevenue = 0;
+          let postNexusRevenue = 0;
+          
+          for (const month of sortedMonthlyRevenue) {
+            if (new Date(month.date) < new Date(nexusDate)) {
+              preNexusRevenue += month.revenue;
+            } else {
+              postNexusRevenue += month.revenue;
+            }
+          }
+
           const { liability, taxRate } = calculateTaxLiability(
             state.code,
             state.totalRevenue,
@@ -91,15 +113,15 @@ export const useFilteredData = (originalData: ProcessedData): ProcessedData => {
             transactionCount: state.transactionCount,
             monthlyRevenue: state.monthlyRevenue,
             nexusDate,
-            thresholdTriggered: runningRevenue >= state.revenueThreshold ? 'revenue' : 'transactions',
+            thresholdTriggered,
             revenueThreshold: state.revenueThreshold,
             transactionThreshold: state.transactionThreshold,
             registrationDeadline: calculateRegistrationDeadline(nexusDate),
             filingFrequency: determineFilingFrequency(state.totalRevenue),
             taxRate,
             liability,
-            preNexusRevenue: 0,
-            postNexusRevenue: state.totalRevenue,
+            preNexusRevenue,
+            postNexusRevenue,
             effectiveDate: nexusDate,
             annualData: {}
           });
