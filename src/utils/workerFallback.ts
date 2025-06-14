@@ -1,61 +1,37 @@
 // Fallback processing for environments without Web Worker support
 import { ProcessedData } from '../types';
-import { processCSVData as originalProcessCSVData } from './csvProcessor';
 import { analyzeNexus } from './nexusEngine';
+import { convertToProcessedData } from './nexusEngine/integration';
 import { TransactionRow, EngineOptions } from './nexusEngine/types';
 
 export const processCSVDataFallback = async (
   data: any[],
   onProgress?: (progress: number) => void
 ): Promise<ProcessedData> => {
-  // Use the original CSV processor as fallback
-  // This will run on the main thread but with progress callbacks
-  
   if (onProgress) {
     onProgress(0);
   }
 
   try {
-    // Simulate the worker's progress reporting
-    const progressInterval = setInterval(() => {
-      // This is a simple simulation - in reality the original processor
-      // would need to be modified to support progress callbacks
-      if (onProgress) {
-        const currentProgress = Math.min(90, Math.random() * 100);
-        onProgress(currentProgress);
-      }
-    }, 100);
+    // Map the data to the format expected by the Nexus Engine
+    const mappedTransactions: TransactionRow[] = data.map((row, index) => ({
+      id: row.id || `tx-${index}`,
+      state_code: normalizeStateCode(row.state || row.state_code || row.State),
+      amount: parseFloat(row.sale_amount || row.sales_amount || row.amount || row.total || '0'),
+      date: parseDate(row.date || row.transaction_date || row.sale_date || row.order_date),
+      revenue_type: mapRevenueType(row.revenue_type)
+    })).filter(tx => tx.state_code && !isNaN(tx.amount) && tx.amount > 0);
 
-    // Create a mock file for the original processor
-    const csvContent = convertDataToCSV(data);
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const file = new File([blob], 'data.csv', { type: 'text/csv' });
-
-    // Process the data using the original processor
-    const processedData = await originalProcessCSVData(file, onProgress);
-    
-    // Run the Nexus Engine on the processed data
-    const mappedTransactions: TransactionRow[] = [];
-    
-    // Map the processed data to the format expected by the Nexus Engine
-    processedData.salesByState.forEach(state => {
-      state.monthlyRevenue.forEach(month => {
-        mappedTransactions.push({
-          id: `${state.code}-${month.date}`,
-          state_code: state.code,
-          amount: month.revenue,
-          date: new Date(month.date),
-          revenue_type: 'taxable' // Default to taxable
-        });
-      });
-    });
+    if (onProgress) {
+      onProgress(30);
+    }
     
     // Run the Nexus Engine analysis
     const engineOptions: EngineOptions = {
       mode: 'multiYearEstimate',
       yearRange: [
-        parseInt(processedData.dataRange.start.substring(0, 4)),
-        parseInt(processedData.dataRange.end.substring(0, 4))
+        new Date().getFullYear() - 3,
+        new Date().getFullYear()
       ],
       ignoreMarketplace: false,
       includeNegativeAmounts: false
@@ -63,10 +39,12 @@ export const processCSVDataFallback = async (
     
     const nexusResults = await analyzeNexus(mappedTransactions, engineOptions);
     
-    // We could use the nexusResults to enhance the processedData here if needed
-    // For now, we'll just return the original processed data
+    if (onProgress) {
+      onProgress(80);
+    }
     
-    clearInterval(progressInterval);
+    // Convert the engine results to ProcessedData format
+    const processedData = convertToProcessedData(nexusResults);
     
     if (onProgress) {
       onProgress(100);
@@ -78,25 +56,43 @@ export const processCSVDataFallback = async (
   }
 };
 
-const convertDataToCSV = (data: any[]): string => {
-  if (data.length === 0) return '';
+// Helper function to normalize state codes
+const normalizeStateCode = (state?: string): string => {
+  if (!state) return '';
+  
+  const stateStr = state.toString().trim().toUpperCase();
+  
+  // If it's already a 2-letter code, return it
+  if (stateStr.length === 2) {
+    return stateStr;
+  }
+  
+  // Map full state names to codes (simplified version)
+  const stateMap: Record<string, string> = {
+    'ALABAMA': 'AL', 'ALASKA': 'AK', 'ARIZONA': 'AZ', 'ARKANSAS': 'AR',
+    'CALIFORNIA': 'CA', 'COLORADO': 'CO', 'CONNECTICUT': 'CT', 'DELAWARE': 'DE',
+    'FLORIDA': 'FL', 'GEORGIA': 'GA', 'HAWAII': 'HI', 'IDAHO': 'ID',
+    'ILLINOIS': 'IL', 'INDIANA': 'IN', 'IOWA': 'IA', 'KANSAS': 'KS',
+    'KENTUCKY': 'KY', 'LOUISIANA': 'LA', 'MAINE': 'ME', 'MARYLAND': 'MD',
+    'MASSACHUSETTS': 'MA', 'MICHIGAN': 'MI', 'MINNESOTA': 'MN', 'MISSISSIPPI': 'MS',
+    'MISSOURI': 'MO', 'MONTANA': 'MT', 'NEBRASKA': 'NE', 'NEVADA': 'NV',
+    'NEW HAMPSHIRE': 'NH', 'NEW JERSEY': 'NJ', 'NEW MEXICO': 'NM', 'NEW YORK': 'NY',
+    'NORTH CAROLINA': 'NC', 'NORTH DAKOTA': 'ND', 'OHIO': 'OH', 'OKLAHOMA': 'OK',
+    'OREGON': 'OR', 'PENNSYLVANIA': 'PA', 'RHODE ISLAND': 'RI', 'SOUTH CAROLINA': 'SC',
+    'SOUTH DAKOTA': 'SD', 'TENNESSEE': 'TN', 'TEXAS': 'TX', 'UTAH': 'UT',
+    'VERMONT': 'VT', 'VIRGINIA': 'VA', 'WASHINGTON': 'WA', 'WEST VIRGINIA': 'WV',
+    'WISCONSIN': 'WI', 'WYOMING': 'WY', 'DISTRICT OF COLUMBIA': 'DC'
+  };
+  
+  return stateMap[stateStr] || stateStr.substring(0, 2);
+};
 
-  const headers = Object.keys(data[0]);
-  const csvRows = [
-    headers.join(','),
-    ...data.map(row => 
-      headers.map(header => {
-        const value = row[header];
-        // Escape commas and quotes in CSV values
-        if (typeof value === 'string' && (value.includes(',') || value.includes('"'))) {
-          return `"${value.replace(/"/g, '""')}"`;
-        }
-        return value;
-      }).join(',')
-    )
-  ];
-
-  return csvRows.join('\n');
+// Helper function to parse dates
+const parseDate = (dateStr?: string): Date => {
+  if (!dateStr) return new Date();
+  
+  const date = new Date(dateStr);
+  return isNaN(date.getTime()) ? new Date() : date;
 };
 
 export const isWebWorkerSupported = (): boolean => {
@@ -116,9 +112,9 @@ export const runNexusEngineInMainThread = async (
     // Map the data to the format expected by the Nexus Engine
     const mappedTransactions: TransactionRow[] = data.map((row, index) => ({
       id: row.id || `tx-${index}`,
-      state_code: row.state || row.state_code,
+      state_code: normalizeStateCode(row.state || row.state_code),
       amount: parseFloat(row.sale_amount || row.amount || 0),
-      date: new Date(row.date || row.transaction_date),
+      date: parseDate(row.date || row.transaction_date),
       revenue_type: mapRevenueType(row.revenue_type)
     }));
     

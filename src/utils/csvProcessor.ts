@@ -1,21 +1,8 @@
 import { runNexusEngineInMainThread, isWebWorkerSupported } from './workerFallback';
-
-export interface ProcessedData {
-  transactions: any[];
-  summary: {
-    totalRows: number;
-    validRows: number;
-    invalidRows: number;
-    totalRevenue: number;
-    statesWithNexus: string[];
-    complianceIssues: string[];
-  };
-  nexusAnalysis: {
-    statesWithNexus: string[];
-    potentialLiability: number;
-    complianceRecommendations: string[];
-  };
-}
+import { ProcessedData } from '../types';
+import { analyzeNexus } from './nexusEngine';
+import { convertToProcessedData } from './nexusEngine/integration';
+import { TransactionRow, EngineOptions } from './nexusEngine/types';
 
 export interface ProgressCallback {
   (progress: number): void;
@@ -23,23 +10,16 @@ export interface ProgressCallback {
 
 // Main CSV processing function
 export const processCSVData = async (
-  file: File,
+  data: any[],
   onProgress?: ProgressCallback
-): Promise<any> => {
-  console.log(`Starting CSV processing for file: ${file.name}`);
+): Promise<ProcessedData> => {
+  console.log(`Starting CSV processing for ${data.length} rows`);
   
   if (onProgress) {
     onProgress(10);
   }
 
   try {
-    // Read the file
-    const data = await readFileAsJSON(file, onProgress);
-    
-    if (onProgress) {
-      onProgress(30);
-    }
-
     // Determine processing strategy based on data size
     if (data.length < 1000) {
       return await processWithMainThreadStrategy(data, onProgress);
@@ -54,49 +34,11 @@ export const processCSVData = async (
   }
 };
 
-// Read file as JSON (from CSV/Excel)
-const readFileAsJSON = async (file: File, onProgress?: ProgressCallback): Promise<any[]> => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    
-    reader.onload = async (e) => {
-      try {
-        if (!e.target || !e.target.result) {
-          reject(new Error('Failed to read file'));
-          return;
-        }
-        
-        // For simplicity in this example, we'll just return a mock dataset
-        // In a real implementation, this would parse CSV/Excel data
-        const mockData = [
-          { date: '2024-01-01', state: 'CA', sale_amount: '1000', transaction_count: '1' },
-          { date: '2024-01-02', state: 'NY', sale_amount: '2000', transaction_count: '2' },
-          { date: '2024-01-03', state: 'TX', sale_amount: '1500', transaction_count: '1' }
-        ];
-        
-        if (onProgress) {
-          onProgress(20);
-        }
-        
-        resolve(mockData);
-      } catch (error) {
-        reject(error);
-      }
-    };
-    
-    reader.onerror = () => {
-      reject(new Error('Failed to read file'));
-    };
-    
-    reader.readAsArrayBuffer(file);
-  });
-};
-
 // Web Worker processing strategy for medium datasets
 const processWithWorkerStrategy = async (
   data: any[],
   onProgress?: ProgressCallback
-): Promise<any> => {
+): Promise<ProcessedData> => {
   console.log(`Using Web Worker processing for ${data.length} rows`);
   
   // Check if Web Workers are supported
@@ -150,24 +92,52 @@ const processWithWorkerStrategy = async (
 const processWithMainThreadStrategy = async (
   data: any[],
   onProgress?: ProgressCallback
-): Promise<any> => {
+): Promise<ProcessedData> => {
   console.log(`Using main thread processing for ${data.length} rows`);
   
   try {
-    // Run the Nexus Engine directly in the main thread
-    const nexusResults = await runNexusEngineInMainThread(data, (progress) => {
-      if (onProgress) {
-        const adjustedProgress = 30 + (progress * 0.5);
-        onProgress(adjustedProgress);
-      }
-    });
+    if (onProgress) {
+      onProgress(30);
+    }
+
+    // Map the data to the format expected by the Nexus Engine
+    const mappedTransactions: TransactionRow[] = data.map((row, index) => ({
+      id: row.id || `tx-${index}`,
+      state_code: normalizeStateCode(row.state || row.state_code || row.State),
+      amount: parseFloat(row.sale_amount || row.sales_amount || row.amount || row.total || '0'),
+      date: parseDate(row.date || row.transaction_date || row.sale_date || row.order_date),
+      revenue_type: mapRevenueType(row.revenue_type)
+    })).filter(tx => tx.state_code && !isNaN(tx.amount) && tx.amount > 0);
+
+    if (onProgress) {
+      onProgress(50);
+    }
+
+    // Run the Nexus Engine analysis
+    const engineOptions: EngineOptions = {
+      mode: 'multiYearEstimate',
+      yearRange: [
+        new Date().getFullYear() - 3,
+        new Date().getFullYear()
+      ],
+      ignoreMarketplace: false,
+      includeNegativeAmounts: false
+    };
+    
+    const nexusResults = await analyzeNexus(mappedTransactions, engineOptions);
     
     if (onProgress) {
       onProgress(80);
     }
     
-    // Process the data to create the ProcessedData format
-    return await finalizeProcessing(data, onProgress, 80);
+    // Convert the engine results to ProcessedData format
+    const processedData = convertToProcessedData(nexusResults);
+    
+    if (onProgress) {
+      onProgress(100);
+    }
+    
+    return processedData;
   } catch (error) {
     console.error('Main thread processing failed:', error);
     throw error;
@@ -178,7 +148,7 @@ const processWithMainThreadStrategy = async (
 const processWithChunkedStrategy = async (
   data: any[],
   onProgress?: ProgressCallback
-): Promise<any> => {
+): Promise<ProcessedData> => {
   console.log(`Using chunked processing for ${data.length} rows`);
   
   const chunkSize = 1000;
@@ -208,104 +178,147 @@ const processWithChunkedStrategy = async (
   return combineProcessedResults(results);
 };
 
-// Helper function to finalize processing
-const finalizeProcessing = async (
-  data: any[],
-  onProgress?: ProgressCallback,
-  startProgress: number = 0
-): Promise<any> => {
-  // Basic processing logic
-  const validRows = data.filter(row => row && Object.keys(row).length > 0);
-  const totalRevenue = validRows.reduce((sum, row) => {
-    const amount = parseFloat(row.sales_amount || row.amount || '0');
-    return sum + (isNaN(amount) ? 0 : amount);
-  }, 0);
+// Helper function to normalize state codes
+const normalizeStateCode = (state?: string): string => {
+  if (!state) return '';
   
-  if (onProgress) {
-    onProgress(startProgress + 10);
+  const stateStr = state.toString().trim().toUpperCase();
+  
+  // If it's already a 2-letter code, return it
+  if (stateStr.length === 2) {
+    return stateStr;
   }
   
-  // Extract unique states
-  const statesWithNexus = [...new Set(
-    validRows
-      .map(row => row.state || row.State)
-      .filter(state => state && typeof state === 'string')
-  )];
-  
-  if (onProgress) {
-    onProgress(startProgress + 15);
-  }
-  
-  // Basic compliance analysis
-  const complianceIssues: string[] = [];
-  if (totalRevenue > 100000) {
-    complianceIssues.push('High revenue threshold reached - review nexus requirements');
-  }
-  
-  if (onProgress) {
-    onProgress(100);
-  }
-  
-  return {
-    transactions: validRows,
-    summary: {
-      totalRows: data.length,
-      validRows: validRows.length,
-      invalidRows: data.length - validRows.length,
-      totalRevenue,
-      statesWithNexus,
-      complianceIssues
-    },
-    nexusAnalysis: {
-      statesWithNexus,
-      potentialLiability: totalRevenue * 0.08, // Rough estimate
-      complianceRecommendations: [
-        'Review state-specific nexus thresholds',
-        'Consider registering in high-revenue states',
-        'Implement automated compliance monitoring'
-      ]
-    }
+  // Map full state names to codes (simplified version)
+  const stateMap: Record<string, string> = {
+    'ALABAMA': 'AL', 'ALASKA': 'AK', 'ARIZONA': 'AZ', 'ARKANSAS': 'AR',
+    'CALIFORNIA': 'CA', 'COLORADO': 'CO', 'CONNECTICUT': 'CT', 'DELAWARE': 'DE',
+    'FLORIDA': 'FL', 'GEORGIA': 'GA', 'HAWAII': 'HI', 'IDAHO': 'ID',
+    'ILLINOIS': 'IL', 'INDIANA': 'IN', 'IOWA': 'IA', 'KANSAS': 'KS',
+    'KENTUCKY': 'KY', 'LOUISIANA': 'LA', 'MAINE': 'ME', 'MARYLAND': 'MD',
+    'MASSACHUSETTS': 'MA', 'MICHIGAN': 'MI', 'MINNESOTA': 'MN', 'MISSISSIPPI': 'MS',
+    'MISSOURI': 'MO', 'MONTANA': 'MT', 'NEBRASKA': 'NE', 'NEVADA': 'NV',
+    'NEW HAMPSHIRE': 'NH', 'NEW JERSEY': 'NJ', 'NEW MEXICO': 'NM', 'NEW YORK': 'NY',
+    'NORTH CAROLINA': 'NC', 'NORTH DAKOTA': 'ND', 'OHIO': 'OH', 'OKLAHOMA': 'OK',
+    'OREGON': 'OR', 'PENNSYLVANIA': 'PA', 'RHODE ISLAND': 'RI', 'SOUTH CAROLINA': 'SC',
+    'SOUTH DAKOTA': 'SD', 'TENNESSEE': 'TN', 'TEXAS': 'TX', 'UTAH': 'UT',
+    'VERMONT': 'VT', 'VIRGINIA': 'VA', 'WASHINGTON': 'WA', 'WEST VIRGINIA': 'WV',
+    'WISCONSIN': 'WI', 'WYOMING': 'WY', 'DISTRICT OF COLUMBIA': 'DC'
   };
+  
+  return stateMap[stateStr] || stateStr.substring(0, 2);
+};
+
+// Helper function to parse dates
+const parseDate = (dateStr?: string): Date => {
+  if (!dateStr) return new Date();
+  
+  const date = new Date(dateStr);
+  return isNaN(date.getTime()) ? new Date() : date;
+};
+
+// Helper to map revenue types
+const mapRevenueType = (type?: string): TransactionRow['revenue_type'] | undefined => {
+  if (!type) return undefined;
+  
+  const lowerType = type.toLowerCase();
+  
+  if (lowerType.includes('marketplace') || lowerType === 'mf') {
+    return 'marketplace';
+  }
+  
+  if (lowerType.includes('non') || lowerType === 'exempt' || lowerType === 'non-taxable') {
+    return 'nontaxable';
+  }
+  
+  if (lowerType === 'taxable' || lowerType === 'tax') {
+    return 'taxable';
+  }
+  
+  return undefined;
 };
 
 // Helper function to combine multiple processed results
 const combineProcessedResults = (results: ProcessedData[]): ProcessedData => {
+  if (results.length === 0) {
+    // Return a default empty ProcessedData structure
+    return {
+      nexusStates: [],
+      totalLiability: 0,
+      priorityStates: [],
+      salesByState: [],
+      dataRange: {
+        start: new Date().toISOString().split('T')[0],
+        end: new Date().toISOString().split('T')[0]
+      },
+      availableYears: [new Date().getFullYear().toString()]
+    };
+  }
+
+  if (results.length === 1) {
+    return results[0];
+  }
+
+  // Combine multiple results
   const combined: ProcessedData = {
-    transactions: [],
-    summary: {
-      totalRows: 0,
-      validRows: 0,
-      invalidRows: 0,
-      totalRevenue: 0,
-      statesWithNexus: [],
-      complianceIssues: []
+    nexusStates: [],
+    totalLiability: 0,
+    priorityStates: [],
+    salesByState: [],
+    dataRange: {
+      start: results[0].dataRange.start,
+      end: results[0].dataRange.end
     },
-    nexusAnalysis: {
-      statesWithNexus: [],
-      potentialLiability: 0,
-      complianceRecommendations: []
-    }
+    availableYears: []
   };
   
+  // Combine nexus states
+  const stateMap = new Map();
   results.forEach(result => {
-    combined.transactions.push(...result.transactions);
-    combined.summary.totalRows += result.summary.totalRows;
-    combined.summary.validRows += result.summary.validRows;
-    combined.summary.invalidRows += result.summary.invalidRows;
-    combined.summary.totalRevenue += result.summary.totalRevenue;
-    combined.summary.statesWithNexus.push(...result.summary.statesWithNexus);
-    combined.summary.complianceIssues.push(...result.summary.complianceIssues);
-    
-    combined.nexusAnalysis.statesWithNexus.push(...result.nexusAnalysis.statesWithNexus);
-    combined.nexusAnalysis.potentialLiability += result.nexusAnalysis.potentialLiability;
-    combined.nexusAnalysis.complianceRecommendations.push(...result.nexusAnalysis.complianceRecommendations);
+    result.nexusStates.forEach(state => {
+      if (stateMap.has(state.code)) {
+        const existing = stateMap.get(state.code);
+        existing.totalRevenue += state.totalRevenue;
+        existing.transactionCount += state.transactionCount;
+        existing.liability += state.liability;
+      } else {
+        stateMap.set(state.code, { ...state });
+      }
+    });
   });
   
-  // Remove duplicates
-  combined.summary.statesWithNexus = [...new Set(combined.summary.statesWithNexus)];
-  combined.nexusAnalysis.statesWithNexus = [...new Set(combined.nexusAnalysis.statesWithNexus)];
-  combined.summary.complianceIssues = [...new Set(combined.summary.complianceIssues)];
-  combined.nexusAnalysis.complianceRecommendations = [...new Set(combined.nexusAnalysis.complianceRecommendations)];
+  combined.nexusStates = Array.from(stateMap.values());
+  combined.totalLiability = combined.nexusStates.reduce((sum, state) => sum + state.liability, 0);
+  combined.priorityStates = [...combined.nexusStates].sort((a, b) => b.liability - a.liability);
+  
+  // Combine sales by state
+  const salesMap = new Map();
+  results.forEach(result => {
+    result.salesByState.forEach(state => {
+      if (salesMap.has(state.code)) {
+        const existing = salesMap.get(state.code);
+        existing.totalRevenue += state.totalRevenue;
+        existing.transactionCount += state.transactionCount;
+      } else {
+        salesMap.set(state.code, { ...state });
+      }
+    });
+  });
+  
+  combined.salesByState = Array.from(salesMap.values());
+  
+  // Combine available years
+  const yearsSet = new Set<string>();
+  results.forEach(result => {
+    result.availableYears.forEach(year => yearsSet.add(year));
+  });
+  combined.availableYears = Array.from(yearsSet).sort();
+  
+  // Update date range
+  const startDates = results.map(r => r.dataRange.start).sort();
+  const endDates = results.map(r => r.dataRange.end).sort();
+  combined.dataRange.start = startDates[0];
+  combined.dataRange.end = endDates[endDates.length - 1];
   
   return combined;
 };

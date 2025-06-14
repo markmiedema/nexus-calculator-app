@@ -17,14 +17,14 @@ function App() {
   const [error, setError] = useState<string | null>(null);
   const [showNexusDemo, setShowNexusDemo] = useState(false);
 
-  const handleFileUpload = async (file: File) => {
+  const handleFileUpload = async (data: any[]) => {
     try {
       setIsProcessing(true);
       setError(null);
       
-      // Process the CSV file
-      const data = await processCSVData(file);
-      setProcessedData(data);
+      // Process the parsed data
+      const processedResult = await processCSVData(data);
+      setProcessedData(processedResult);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An unknown error occurred');
       setProcessedData(null);

@@ -14,7 +14,7 @@ import * as XLSX from 'xlsx';
 import { detectColumnMappings } from '../utils/nexusEngine/columnMappings';
 
 interface FileUploadProps {
-  onFileUpload: (file: File) => void;
+  onFileUpload: (data: any[]) => void;
   isProcessing: boolean;
   error: string | null;
 }
@@ -225,9 +225,9 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload, isProcessing, err
   };
 
   const handleProceedWithAnalysis = () => {
-    if (selectedFile) {
+    if (parsedData.length > 0) {
       setShowPreview(false);
-      onFileUpload(selectedFile);
+      onFileUpload(parsedData);
     }
   };
 
@@ -235,6 +235,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload, isProcessing, err
     setShowPreview(false);
     setSelectedFile(null);
     setValidationResult(null);
+    setParsedData([]);
     resetWorkerState();
     resetChunkState();
     if (fileInputRef.current) {
@@ -402,6 +403,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload, isProcessing, err
                   onClick={() => {
                     setSelectedFile(null);
                     setValidationResult(null);
+                    setParsedData([]);
                     resetWorkerState();
                     resetChunkState();
                     if (fileInputRef.current) fileInputRef.current.value = '';
@@ -567,9 +569,9 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload, isProcessing, err
               <strong>Smart Processing:</strong> Our system automatically chooses the best processing method based on your file size:
             </p>
             <ul className="mt-2 text-xs text-blue-600 space-y-1">
-              <li>• <strong>Small files (&lt;1K rows):</strong> Fast main-thread processing</li>
+              <li>• <strong>Small files (<1K rows):</strong> Fast main-thread processing</li>
               <li>• <strong>Medium files (1K-5K rows):</strong> Background Web Worker processing</li>
-              <li>• <strong>Large files (&gt;5K rows):</strong> Chunked parallel processing with worker pool</li>
+              <li>• <strong>Large files (>5K rows):</strong> Chunked parallel processing with worker pool</li>
             </ul>
           </div>
         </div>
