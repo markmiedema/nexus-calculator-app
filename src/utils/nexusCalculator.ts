@@ -17,8 +17,15 @@ interface NexusResult {
       transactions: number;
     }
   };
+  // New field for rolling 12-month calculation
+  rollingBreachDate: string | null;
+  rollingBreachType: 'revenue' | 'transactions' | null;
 }
 
+/**
+ * Calculate nexus status for a state based on revenue and transaction thresholds
+ * Implements both calendar year and rolling 12-month calculations
+ */
 export const calculateNexus = (
   stateCode: string,
   totalRevenue: number,
@@ -37,7 +44,9 @@ export const calculateNexus = (
       preNexusRevenue: 0,
       postNexusRevenue: 0,
       nexusThresholdAmount: 0,
-      yearlyBreaches: {}
+      yearlyBreaches: {},
+      rollingBreachDate: null,
+      rollingBreachType: null
     };
   }
 
@@ -66,7 +75,7 @@ export const calculateNexus = (
   let preNexusRevenue = 0;
   let postNexusRevenue = 0;
   
-  // Process each month chronologically
+  // Process each month chronologically for calendar year calculation
   for (const month of sortedData) {
     const monthDate = new Date(month.date);
     const year = monthDate.getFullYear().toString();
@@ -157,6 +166,40 @@ export const calculateNexus = (
     preNexusRevenue = totalRevenue;
   }
   
+  // Implement rolling 12-month calculation
+  let rollingBreachDate: string | null = null;
+  let rollingBreachType: 'revenue' | 'transactions' | null = null;
+  
+  if (sortedData.length > 0) {
+    // Implement sliding window approach
+    const rollingResult = calculateRolling12MonthNexus(
+      sortedData, 
+      revenueThreshold, 
+      transactionThreshold
+    );
+    
+    rollingBreachDate = rollingResult.breachDate;
+    rollingBreachType = rollingResult.breachType;
+    
+    // If rolling breach found but no calendar year breach, use rolling breach
+    if (rollingBreachDate && !firstBreachDate) {
+      firstBreachDate = rollingBreachDate;
+      firstBreachType = rollingBreachType;
+      
+      // Recalculate pre and post nexus revenue
+      preNexusRevenue = 0;
+      postNexusRevenue = 0;
+      
+      for (const month of sortedData) {
+        if (new Date(month.date) < new Date(rollingBreachDate)) {
+          preNexusRevenue += month.revenue;
+        } else {
+          postNexusRevenue += month.revenue;
+        }
+      }
+    }
+  }
+  
   return {
     hasNexus: firstBreachDate !== null,
     nexusDate: firstBreachDate,
@@ -165,8 +208,98 @@ export const calculateNexus = (
     postNexusRevenue,
     nexusThresholdAmount: firstBreachType === 'revenue' ? revenueThreshold : 
                          (firstBreachType === 'transactions' ? transactionThreshold || 0 : 0),
-    yearlyBreaches
+    yearlyBreaches,
+    rollingBreachDate,
+    rollingBreachType
   };
+};
+
+/**
+ * Calculate nexus using a rolling 12-month window
+ */
+export const calculateRolling12MonthNexus = (
+  sortedData: MonthlyRevenue[],
+  revenueThreshold: number,
+  transactionThreshold: number | null
+): { 
+  breachDate: string | null; 
+  breachType: 'revenue' | 'transactions' | null;
+  windowRevenue: number;
+  windowTransactions: number;
+} => {
+  if (sortedData.length === 0) {
+    return { 
+      breachDate: null, 
+      breachType: null,
+      windowRevenue: 0,
+      windowTransactions: 0
+    };
+  }
+  
+  // Initialize window
+  let windowStart = 0;
+  let windowRevenue = 0;
+  let windowTransactions = 0;
+  
+  // For each transaction, maintain a sliding window of at most 365 days
+  for (let windowEnd = 0; windowEnd < sortedData.length; windowEnd++) {
+    const currentDate = new Date(sortedData[windowEnd].date);
+    
+    // Add current month to window
+    windowRevenue += sortedData[windowEnd].revenue;
+    windowTransactions += sortedData[windowEnd].transactions;
+    
+    // Shrink window from the beginning if it exceeds 365 days
+    while (windowStart < windowEnd) {
+      const startDate = new Date(sortedData[windowStart].date);
+      const daysDifference = getDaysDifference(startDate, currentDate);
+      
+      if (daysDifference <= 365) {
+        break;
+      }
+      
+      // Remove the oldest month from the window
+      windowRevenue -= sortedData[windowStart].revenue;
+      windowTransactions -= sortedData[windowStart].transactions;
+      windowStart++;
+    }
+    
+    // Check if thresholds are exceeded within the current window
+    if (windowRevenue >= revenueThreshold) {
+      return { 
+        breachDate: sortedData[windowEnd].date, 
+        breachType: 'revenue',
+        windowRevenue,
+        windowTransactions
+      };
+    }
+    
+    if (transactionThreshold !== null && windowTransactions >= transactionThreshold) {
+      return { 
+        breachDate: sortedData[windowEnd].date, 
+        breachType: 'transactions',
+        windowRevenue,
+        windowTransactions
+      };
+    }
+  }
+  
+  // No breach found
+  return { 
+    breachDate: null, 
+    breachType: null,
+    windowRevenue,
+    windowTransactions
+  };
+};
+
+/**
+ * Calculate days difference between two dates, accounting for leap years
+ */
+export const getDaysDifference = (startDate: Date, endDate: Date): number => {
+  const millisecondsPerDay = 1000 * 60 * 60 * 24;
+  const timeDifference = endDate.getTime() - startDate.getTime();
+  return Math.floor(timeDifference / millisecondsPerDay);
 };
 
 // Function to determine if a specific date is within the nexus period

@@ -5,6 +5,8 @@ import {
 } from '../dataValidation';
 import { detectColumns } from '../columnDetection';
 import { cleanDataset } from '../dataCleaning';
+import { calculateNexus } from '../nexusCalculator';
+import { MonthlyRevenue } from '../../types';
 
 describe('Real World Scenarios Testing', () => {
   describe('E-commerce Platform Exports', () => {
@@ -624,6 +626,94 @@ describe('Real World Scenarios Testing', () => {
       const amountMapping = preview.detectedMappings.find(m => m.standardColumn === 'sale_amount');
       expect(amountMapping?.detectedHeader).toBe('Sales Amount ($)');
       expect(amountMapping?.status).toBe('detected');
+    });
+  });
+
+  describe('Nexus Calculation Scenarios', () => {
+    it('should correctly identify nexus with year resets', () => {
+      const monthlyData: MonthlyRevenue[] = [
+        // 2023 data - exceeds threshold
+        { date: '2023-01-15', revenue: 60000, transactions: 100 },
+        { date: '2023-02-15', revenue: 60000, transactions: 100 },
+        // 2024 data - also exceeds threshold
+        { date: '2024-01-15', revenue: 60000, transactions: 100 },
+        { date: '2024-02-15', revenue: 60000, transactions: 100 },
+      ];
+      
+      const result = calculateNexus('TX', 240000, 400, monthlyData);
+      
+      // Should identify nexus in 2023
+      expect(result.hasNexus).toBe(true);
+      expect(result.nexusDate).toBe('2023-02-15');
+      
+      // Should have yearly breaches for both years
+      expect(result.yearlyBreaches['2023'].hasNexus).toBe(true);
+      expect(result.yearlyBreaches['2023'].nexusDate).toBe('2023-02-15');
+      
+      expect(result.yearlyBreaches['2024'].hasNexus).toBe(true);
+      expect(result.yearlyBreaches['2024'].nexusDate).toBe('2024-02-15');
+      
+      // Should calculate pre/post nexus revenue correctly
+      expect(result.preNexusRevenue).toBe(60000);
+      expect(result.postNexusRevenue).toBe(180000);
+    });
+    
+    it('should handle partial year data correctly', () => {
+      const monthlyData: MonthlyRevenue[] = [
+        // Only partial 2024 data
+        { date: '2024-03-15', revenue: 60000, transactions: 100 },
+        { date: '2024-04-15', revenue: 60000, transactions: 100 },
+      ];
+      
+      const result = calculateNexus('CA', 120000, 200, monthlyData);
+      
+      // Should not have nexus (CA threshold is 500000)
+      expect(result.hasNexus).toBe(false);
+      
+      // Should have yearly breach data for 2024
+      expect(result.yearlyBreaches['2024']).toBeDefined();
+      expect(result.yearlyBreaches['2024'].hasNexus).toBe(false);
+      expect(result.yearlyBreaches['2024'].revenue).toBe(120000);
+    });
+    
+    it('should handle transaction-based nexus correctly', () => {
+      const monthlyData: MonthlyRevenue[] = [
+        // Small revenue but many transactions
+        { date: '2024-01-15', revenue: 5000, transactions: 100 },
+        { date: '2024-02-15', revenue: 5000, transactions: 100 },
+        { date: '2024-03-15', revenue: 5000, transactions: 100 },
+      ];
+      
+      const result = calculateNexus('WA', 15000, 300, monthlyData);
+      
+      // Should have nexus based on transactions
+      expect(result.hasNexus).toBe(true);
+      expect(result.thresholdType).toBe('transactions');
+      expect(result.nexusDate).toBe('2024-03-15');
+    });
+    
+    it('should handle mixed year data with different thresholds', () => {
+      const monthlyData: MonthlyRevenue[] = [
+        // 2023 data - below threshold
+        { date: '2023-01-15', revenue: 40000, transactions: 80 },
+        { date: '2023-02-15', revenue: 40000, transactions: 80 },
+        // 2024 data - exceeds threshold
+        { date: '2024-01-15', revenue: 60000, transactions: 120 },
+        { date: '2024-02-15', revenue: 60000, transactions: 120 },
+      ];
+      
+      const result = calculateNexus('TX', 200000, 400, monthlyData);
+      
+      // Should identify nexus in 2024
+      expect(result.hasNexus).toBe(true);
+      expect(result.nexusDate).toBe('2024-02-15');
+      
+      // 2023 should not have nexus
+      expect(result.yearlyBreaches['2023'].hasNexus).toBe(false);
+      
+      // 2024 should have nexus
+      expect(result.yearlyBreaches['2024'].hasNexus).toBe(true);
+      expect(result.yearlyBreaches['2024'].nexusDate).toBe('2024-02-15');
     });
   });
 });

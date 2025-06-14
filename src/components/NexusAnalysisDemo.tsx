@@ -8,7 +8,7 @@ const NexusAnalysisDemo: React.FC = () => {
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [ignoreMarketplace, setIgnoreMarketplace] = useState<boolean>(true);
   const [includeNegativeAmounts, setIncludeNegativeAmounts] = useState<boolean>(false);
-  const [selectedMode, setSelectedMode] = useState<'singleYear' | 'multiYearEstimate'>('singleYear');
+  const [selectedMode, setSelectedMode] = useState<'singleYear' | 'multiYearEstimate' | 'rolling12Month'>('singleYear');
   const [yearRange, setYearRange] = useState<[number, number]>([
     new Date().getFullYear() - 3,
     new Date().getFullYear()
@@ -61,7 +61,7 @@ const NexusAnalysisDemo: React.FC = () => {
       });
     }
     
-    // Generate WA transactions (will exceed transaction threshold)
+    // Generate WA transactions (will trigger transaction threshold)
     for (let i = 1; i <= 250; i++) {
       transactions.push({
         id: `wa-${i}`,
@@ -101,6 +101,33 @@ const NexusAnalysisDemo: React.FC = () => {
       });
     }
     
+    // Generate rolling 12-month transactions for IL
+    // These will not trigger calendar year nexus but will trigger rolling 12-month nexus
+    transactions.push({
+      id: 'il-1',
+      state: 'IL',
+      amount: 40000,
+      date: new Date(`${prevYear}-10-15`)
+    });
+    transactions.push({
+      id: 'il-2',
+      state: 'IL',
+      amount: 40000,
+      date: new Date(`${prevYear}-12-15`)
+    });
+    transactions.push({
+      id: 'il-3',
+      state: 'IL',
+      amount: 40000,
+      date: new Date(`${currentYear}-02-15`)
+    });
+    transactions.push({
+      id: 'il-4',
+      state: 'IL',
+      amount: 40000,
+      date: new Date(`${currentYear}-04-15`)
+    });
+    
     return transactions;
   };
   
@@ -109,11 +136,12 @@ const NexusAnalysisDemo: React.FC = () => {
       const sampleData = generateSampleData();
       
       const options: EngineOptions = {
-        mode: selectedMode,
+        mode: selectedMode === 'rolling12Month' ? 'singleYear' : selectedMode,
         analysisYear: selectedYear,
         yearRange: yearRange,
         ignoreMarketplace,
-        includeNegativeAmounts
+        includeNegativeAmounts,
+        useRolling12Month: selectedMode === 'rolling12Month'
       };
       
       await analyzeTransactions(sampleData, options);
@@ -177,6 +205,12 @@ const NexusAnalysisDemo: React.FC = () => {
             {state.breach_type && (
               <span className="ml-1">({state.breach_type})</span>
             )}
+            {state.rolling_breach && (
+              <div className="flex items-center mt-1 text-blue-700">
+                <Clock className="h-3 w-3 mr-1" />
+                <span>Rolling 12-month calculation</span>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -204,10 +238,11 @@ const NexusAnalysisDemo: React.FC = () => {
                 >
                   <option value="singleYear">Single Year</option>
                   <option value="multiYearEstimate">Multi-Year Estimate</option>
+                  <option value="rolling12Month">Rolling 12-Month</option>
                 </select>
               </div>
               
-              {selectedMode === 'singleYear' ? (
+              {selectedMode === 'singleYear' || selectedMode === 'rolling12Month' ? (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Analysis Year
@@ -296,6 +331,12 @@ const NexusAnalysisDemo: React.FC = () => {
               <p className="text-sm text-gray-600 mb-4">
                 This demo uses sample transaction data to demonstrate the Nexus Engine.
                 In a real application, you would upload your own transaction data.
+                {selectedMode === 'rolling12Month' && (
+                  <span className="block mt-2 text-blue-600 font-medium">
+                    Rolling 12-month mode analyzes transactions within a 365-day window, 
+                    regardless of calendar year boundaries.
+                  </span>
+                )}
               </p>
               
               <button

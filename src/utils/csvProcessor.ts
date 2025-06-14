@@ -588,6 +588,11 @@ const determineNexusStates = (salesByState: StateSales): NexusState[] => {
       let preNexusRevenue = nexusResult.preNexusRevenue;
       let postNexusRevenue = nexusResult.postNexusRevenue;
       
+      // Determine calculation method
+      const calculationMethod = nexusResult.rollingBreachDate && 
+                               nexusResult.nexusDate === nexusResult.rollingBreachDate
+                               ? 'rolling-12-month' : 'calendar-year';
+      
       nexusStates.push({
         code: stateCode,
         name: getStateName(stateCode),
@@ -606,7 +611,10 @@ const determineNexusStates = (salesByState: StateSales): NexusState[] => {
         postNexusRevenue: postNexusRevenue,
         effectiveDate: nexusResult.nexusDate,
         annualData: {},
-        yearlyBreaches: nexusResult.yearlyBreaches
+        yearlyBreaches: nexusResult.yearlyBreaches,
+        rollingBreachDate: nexusResult.rollingBreachDate,
+        rollingBreachType: nexusResult.rollingBreachType,
+        calculationMethod
       });
     }
   });

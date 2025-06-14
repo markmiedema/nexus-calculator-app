@@ -84,6 +84,10 @@ export interface NexusState {
       transactions: number;
     }
   };
+  // New fields for rolling 12-month calculation
+  rollingBreachDate?: string | null;
+  rollingBreachType?: 'revenue' | 'transactions' | null;
+  calculationMethod?: 'calendar-year' | 'rolling-12-month';
 }
 
 // Year selection context

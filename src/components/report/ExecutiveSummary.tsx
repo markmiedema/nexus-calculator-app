@@ -20,6 +20,11 @@ const ExecutiveSummary: React.FC<ExecutiveSummaryProps> = ({ data }) => {
     .filter(state => state.thresholdProximity < 50 && !nexusStates.find(n => n.code === state.code))
     .sort((a, b) => b.thresholdProximity - a.thresholdProximity);
   
+  // Count states using rolling-12-month calculation
+  const rollingNexusStates = nexusStates.filter(state => 
+    state.calculationMethod === 'rolling-12-month'
+  );
+  
   return (
     <div className="space-y-8">
       <div className="grid md:grid-cols-2 gap-6">
@@ -33,6 +38,11 @@ const ExecutiveSummary: React.FC<ExecutiveSummaryProps> = ({ data }) => {
                   <div className="bg-white p-4 rounded-md shadow-sm">
                     <div className="text-sm text-gray-500">Nexus Established In</div>
                     <div className="text-2xl font-bold text-blue-600">{nexusStates.length} States</div>
+                    {rollingNexusStates.length > 0 && (
+                      <div className="text-xs text-blue-500 mt-1">
+                        {rollingNexusStates.length} using rolling 12-month
+                      </div>
+                    )}
                   </div>
                   <div className="bg-white p-4 rounded-md shadow-sm">
                     <div className="text-sm text-gray-500">Total Est. Liability</div>
@@ -68,7 +78,12 @@ const ExecutiveSummary: React.FC<ExecutiveSummaryProps> = ({ data }) => {
                     <div key={state.code} className="p-3 flex justify-between items-center">
                       <div>
                         <span className="font-medium text-gray-800">{index + 1}. {state.name}</span>
-                        <span className="ml-2 text-sm text-gray-500">Nexus since {state.nexusDate}</span>
+                        <span className="ml-2 text-sm text-gray-500">
+                          Nexus since {state.nexusDate}
+                          {state.calculationMethod === 'rolling-12-month' && (
+                            <span className="ml-1 text-blue-500">(rolling)</span>
+                          )}
+                        </span>
                       </div>
                       <div className="font-semibold text-green-600">${state.liability.toLocaleString()}</div>
                     </div>
@@ -98,6 +113,9 @@ const ExecutiveSummary: React.FC<ExecutiveSummaryProps> = ({ data }) => {
                       </div>
                       <div className="text-sm text-gray-500 mt-1">
                         Nexus since {state.nexusDate}
+                        {state.calculationMethod === 'rolling-12-month' && (
+                          <span className="ml-1 text-blue-500">(rolling 12-month)</span>
+                        )}
                       </div>
                     </div>
                   ))
@@ -142,7 +160,7 @@ const ExecutiveSummary: React.FC<ExecutiveSummaryProps> = ({ data }) => {
             <div className="bg-green-50 rounded-lg p-4 border border-green-100">
               <div className="flex items-center mb-3">
                 <CheckCircle className="h-5 w-5 text-green-600 mr-2" />
-                <h3 className="font-medium text-green-800">Safe Zone (&lt;50%)</h3>
+                <h3 className="font-medium text-green-800">Safe Zone (<50%)</h3>
               </div>
               <div className="space-y-2">
                 {safeStates.length > 0 ? (
@@ -174,6 +192,9 @@ const ExecutiveSummary: React.FC<ExecutiveSummaryProps> = ({ data }) => {
         {hasNexus ? (
           <ul className="mt-2 text-blue-700 text-sm space-y-1 list-disc pl-5">
             <li>Your sales activities have triggered nexus in {nexusStates.length} states.</li>
+            {rollingNexusStates.length > 0 && (
+              <li>{rollingNexusStates.length} states triggered using rolling 12-month calculation.</li>
+            )}
             <li>Top 3 states by liability: {priorityStates.slice(0, 3).map(s => s.name).join(', ')}.</li>
             <li>Immediate registration action is recommended for all states with established nexus.</li>
             <li>Total estimated tax liability across all states is ${totalLiability.toLocaleString()}.</li>

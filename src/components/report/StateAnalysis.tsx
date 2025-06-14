@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ProcessedData, NexusState, SalesByState } from '../../types';
 import RevenueChart from '../visualizations/RevenueChart';
-import { Filter, ArrowUp, ArrowDown, TrendingUp, AlertCircle } from 'lucide-react';
+import { Filter, ArrowUp, ArrowDown, TrendingUp, AlertCircle, Clock } from 'lucide-react';
 
 interface StateAnalysisProps {
   data: ProcessedData;
@@ -38,14 +38,26 @@ const StateAnalysis: React.FC<StateAnalysisProps> = ({ data }) => {
   };
 
   const getThresholdStatus = (state: SalesByState) => {
-    const hasNexus = nexusStates.some(n => n.code === state.code);
-    if (hasNexus || state.thresholdProximity >= 100) {
+    const nexusState = nexusStates.find(n => n.code === state.code);
+    
+    if (nexusState) {
+      return {
+        message: nexusState.calculationMethod === 'rolling-12-month' 
+          ? 'Nexus threshold exceeded (rolling 12-month)' 
+          : 'Nexus threshold exceeded',
+        icon: <AlertCircle className="h-4 w-4 text-red-600" />,
+        className: 'text-red-600'
+      };
+    }
+    
+    if (state.thresholdProximity >= 100) {
       return {
         message: 'Nexus threshold exceeded',
         icon: <AlertCircle className="h-4 w-4 text-red-600" />,
         className: 'text-red-600'
       };
     }
+    
     if (state.thresholdProximity >= 75) {
       return {
         message: 'Approaching nexus threshold',
@@ -53,6 +65,7 @@ const StateAnalysis: React.FC<StateAnalysisProps> = ({ data }) => {
         className: 'text-amber-600'
       };
     }
+    
     return {
       message: `${Math.max(0, state.revenueThreshold - state.totalRevenue).toLocaleString()} until threshold`,
       icon: null,
@@ -87,6 +100,8 @@ const StateAnalysis: React.FC<StateAnalysisProps> = ({ data }) => {
           <div className="divide-y divide-gray-200 max-h-[600px] overflow-y-auto">
             {sortedStates.map((state) => {
               const status = getThresholdStatus(state);
+              const nexusState = nexusStates.find(n => n.code === state.code);
+              
               return (
                 <button
                   key={state.code}
@@ -99,6 +114,12 @@ const StateAnalysis: React.FC<StateAnalysisProps> = ({ data }) => {
                     <div>
                       <span className="font-medium text-gray-800">{state.name}</span>
                       <span className="ml-1 text-xs text-gray-500">({state.code})</span>
+                      {nexusState?.calculationMethod === 'rolling-12-month' && (
+                        <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                          <Clock className="h-3 w-3 mr-0.5" />
+                          Rolling
+                        </span>
+                      )}
                     </div>
                     <div className="text-right">
                       <div className="text-sm font-medium text-gray-900">
@@ -188,7 +209,7 @@ const StateAnalysis: React.FC<StateAnalysisProps> = ({ data }) => {
                             selectedState.thresholdProximity >= 75 ? 'bg-amber-500' : 'bg-blue-500'
                           }`}
                           style={{ width: `${Math.min(selectedState.thresholdProximity, 100)}%` }}
-                        ></div>
+                        />
                       </div>
                     </div>
                     <div className="text-sm flex items-center">
@@ -197,6 +218,16 @@ const StateAnalysis: React.FC<StateAnalysisProps> = ({ data }) => {
                         {getThresholdStatus(selectedState).message}
                       </span>
                     </div>
+                    
+                    {/* Rolling 12-Month Analysis */}
+                    {nexusStates.find(n => n.code === selectedState.code)?.calculationMethod === 'rolling-12-month' && (
+                      <div className="mt-2 p-2 bg-blue-50 rounded-md">
+                        <div className="flex items-center text-sm text-blue-700">
+                          <Clock className="h-4 w-4 mr-1" />
+                          <span>Nexus triggered using rolling 12-month calculation</span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

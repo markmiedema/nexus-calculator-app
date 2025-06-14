@@ -21,6 +21,7 @@ export interface EngineOptions {
   yearRange?: [number, number];     // multi-year modes
   ignoreMarketplace?: boolean;      // drop marketplace-facilitator rows
   includeNegativeAmounts?: boolean; // whether to include negative amounts (returns/refunds)
+  useRolling12Month?: boolean;      // whether to use rolling 12-month calculation
 }
 
 /**
@@ -44,6 +45,11 @@ export interface NexusResult {
   threshold_transactions?: number | null;
   breach_type?: 'revenue' | 'transactions' | null;
   threshold_percentage?: number;
+  
+  // Rolling 12-month fields
+  rolling_breach?: boolean;
+  rolling_breach_date?: Date;
+  rolling_breach_type?: 'revenue' | 'transactions' | null;
 }
 
 /**

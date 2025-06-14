@@ -3,6 +3,7 @@
 
 import { TransactionRow, NexusResult, NexusRule, BreachResult } from './types';
 import { getCurrentRule } from './rules';
+import { getDaysDifference, calculateRolling12MonthNexus } from '../nexusCalculator';
 
 /**
  * Calculate nexus for a single year
@@ -10,21 +11,25 @@ import { getCurrentRule } from './rules';
 export function singleYearStrategy(
   rows: TransactionRow[], 
   rule: NexusRule, 
-  year: number
+  year: number,
+  useRolling12Month: boolean = false
 ): NexusResult {
   // Filter rows for the specified year
   const yearRows = rows.filter(r => r.date.getUTCFullYear() === year);
   
-  // Calculate cumulative breach
-  const { sum, cnt, breachIdx, breachType } = cumulativeBreach(yearRows, rule);
+  // Sort rows by date
+  const sortedRows = [...yearRows].sort((a, b) => a.date.getTime() - b.date.getTime());
   
-  // Determine if thresholds were exceeded
-  const exceeded = breachIdx !== -1;
+  // Calculate cumulative breach for calendar year
+  const { sum, cnt, breachIdx, breachType } = cumulativeBreach(sortedRows, rule);
+  
+  // Determine if thresholds were exceeded in calendar year
+  const calendarYearExceeded = breachIdx !== -1;
   
   // Create result object
   const result: NexusResult = {
     state_code: rule.state_code,
-    exceeded,
+    exceeded: calendarYearExceeded,
     estimate_mode: false,
     total_revenue: sum,
     total_transactions: cnt,
@@ -34,10 +39,52 @@ export function singleYearStrategy(
     breach_type: breachType
   };
   
-  // Add breach details if thresholds were exceeded
-  if (exceeded && breachIdx !== -1) {
-    result.first_breach_date = yearRows[breachIdx].date;
-    result.first_breach_transaction_id = yearRows[breachIdx].id;
+  // Add breach details if thresholds were exceeded in calendar year
+  if (calendarYearExceeded && breachIdx !== -1) {
+    result.first_breach_date = sortedRows[breachIdx].date;
+    result.first_breach_transaction_id = sortedRows[breachIdx].id;
+  }
+  
+  // If rolling 12-month calculation is enabled, check for rolling breach
+  if (useRolling12Month) {
+    // Use all rows, not just the current year's rows
+    const allSortedRows = [...rows].sort((a, b) => a.date.getTime() - b.date.getTime());
+    
+    // Convert TransactionRow[] to format needed by calculateRolling12MonthNexus
+    const monthlyData = allSortedRows.map(row => ({
+      date: row.date.toISOString().split('T')[0],
+      revenue: row.amount,
+      transactions: 1
+    }));
+    
+    const rollingResult = calculateRolling12MonthNexus(
+      monthlyData,
+      rule.amount,
+      rule.txn
+    );
+    
+    // If rolling breach found
+    if (rollingResult.breachDate) {
+      // Add rolling breach details
+      result.rolling_breach = true;
+      result.rolling_breach_date = new Date(rollingResult.breachDate);
+      result.rolling_breach_type = rollingResult.breachType;
+      
+      // If no calendar year breach but rolling breach found, use rolling breach
+      if (!calendarYearExceeded) {
+        result.exceeded = true;
+        result.first_breach_date = new Date(rollingResult.breachDate);
+        result.breach_type = rollingResult.breachType;
+        
+        // Find the transaction ID for the breach date
+        const breachTransaction = allSortedRows.find(
+          row => row.date.toISOString().split('T')[0] === rollingResult.breachDate
+        );
+        if (breachTransaction) {
+          result.first_breach_transaction_id = breachTransaction.id;
+        }
+      }
+    }
   }
   
   return result;
@@ -49,7 +96,8 @@ export function singleYearStrategy(
 export function multiYearEstimateStrategy(
   rows: TransactionRow[], 
   rule: NexusRule, 
-  yearRange: [number, number]
+  yearRange: [number, number],
+  useRolling12Month: boolean = false
 ): NexusResult {
   const [startYear, endYear] = yearRange;
   
@@ -92,6 +140,53 @@ export function multiYearEstimateStrategy(
         breach_type: breachType,
         period_qualified: `${year}`
       };
+    }
+  }
+  
+  // If rolling 12-month calculation is enabled, check for rolling breach
+  if (useRolling12Month) {
+    // Sort all rows by date
+    const allSortedRows = [...rows].sort((a, b) => a.date.getTime() - b.date.getTime());
+    
+    // Convert TransactionRow[] to format needed by calculateRolling12MonthNexus
+    const monthlyData = allSortedRows.map(row => ({
+      date: row.date.toISOString().split('T')[0],
+      revenue: row.amount,
+      transactions: 1
+    }));
+    
+    const rollingResult = calculateRolling12MonthNexus(
+      monthlyData,
+      rule.amount,
+      rule.txn
+    );
+    
+    // If rolling breach found
+    if (rollingResult.breachDate) {
+      // Find the transaction for the breach date
+      const breachTransaction = allSortedRows.find(
+        row => row.date.toISOString().split('T')[0] === rollingResult.breachDate
+      );
+      
+      if (breachTransaction) {
+        return {
+          state_code: rule.state_code,
+          exceeded: true,
+          first_breach_date: breachTransaction.date,
+          first_breach_transaction_id: breachTransaction.id,
+          estimate_mode: true,
+          total_revenue: rollingResult.windowRevenue,
+          total_transactions: rollingResult.windowTransactions,
+          threshold_revenue: rule.amount,
+          threshold_transactions: rule.txn,
+          threshold_percentage: 100, // Exceeded, so 100%
+          breach_type: rollingResult.breachType,
+          period_qualified: 'rolling-12-month',
+          rolling_breach: true,
+          rolling_breach_date: breachTransaction.date,
+          rolling_breach_type: rollingResult.breachType
+        };
+      }
     }
   }
   
