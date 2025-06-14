@@ -9,7 +9,7 @@ interface YearSelectionProviderProps {
 }
 
 export const YearSelectionProvider: React.FC<YearSelectionProviderProps> = ({ children, availableYears }) => {
-  const [selectedYears, setSelectedYears] = useState<string[]>(availableYears);
+  const [selectedYears, setSelectedYears] = useState<string[]>(availableYears || []);
 
   const toggleYear = useCallback((year: string) => {
     setSelectedYears(prev => 
@@ -20,7 +20,7 @@ export const YearSelectionProvider: React.FC<YearSelectionProviderProps> = ({ ch
   }, []);
 
   const selectAllYears = useCallback(() => {
-    setSelectedYears(availableYears);
+    setSelectedYears(availableYears || []);
   }, [availableYears]);
 
   const clearAllYears = useCallback(() => {
@@ -30,7 +30,7 @@ export const YearSelectionProvider: React.FC<YearSelectionProviderProps> = ({ ch
   return (
     <YearSelectionContext.Provider value={{
       selectedYears,
-      availableYears,
+      availableYears: availableYears || [],
       toggleYear,
       selectAllYears,
       clearAllYears,
