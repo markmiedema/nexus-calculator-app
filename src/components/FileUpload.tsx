@@ -5,7 +5,7 @@ import WorkerStatus from './WorkerStatus';
 import ChunkProgressDisplay from './ChunkProgressDisplay';
 import ColumnMappingPreview from './ColumnMappingPreview';
 import { validateCSVWithSmartDetection, generateColumnMappingPreview, downloadCSVTemplate, ValidationResult } from '../utils/dataValidation';
-import { detectColumns } from '../utils/columnDetection';
+import { detectColumns } from './columnDetection';
 import { useWebWorker } from '../hooks/useWebWorker';
 import { useChunkedProcessing } from '../hooks/useChunkedProcessing';
 import { isWebWorkerSupported } from '../utils/workerFallback';
@@ -487,6 +487,21 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload, isProcessing, err
                     <p className="mt-1 text-sm text-green-700">
                       All required columns detected. Click "Review Mappings" to proceed.
                     </p>
+                    <div className="mt-3">
+                      <button
+                        onClick={() => {
+                          if (validationResult.detectionResult) {
+                            setShowPreview(true);
+                          } else {
+                            // If no detection result but file is valid, proceed directly
+                            handleProceedWithAnalysis();
+                          }
+                        }}
+                        className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+                      >
+                        Review Mappings
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>

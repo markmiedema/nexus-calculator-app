@@ -276,17 +276,16 @@ export const generateColumnMappingPreview = (detectionResult: DetectionResult): 
 // Generate CSV template for download
 export const generateCSVTemplate = (): string => {
   const headers = [
-    'date', 'state', 'sale_amount', 'transaction_count', 'city', 'county', 'zip_code',
-    'transaction_id', 'revenue_type', 'product_category', 'marketplace_facilitator_flag',
-    'customer_type', 'exemption_certificate_id'
+    'date', 'state', 'sale_amount', 'transaction_count', 'transaction_id', 'revenue_type', 
+    'product_category', 'marketplace_facilitator_flag', 'customer_type', 'exemption_certificate_id'
   ];
   
   const sampleData = [
-    ['2024-01-15', 'CA', '1500.00', '1', 'Los Angeles', 'Los Angeles County', '90210', 'TX-001', 'Product', 'Electronics', 'N', 'Retail', 'EC-12345'],
-    ['2024-01-16', 'TX', '2500.00', '2', 'Houston', 'Harris County', '77001', 'TX-002', 'Service', 'Software', 'N', 'Business', 'EC-23456'],
-    ['2024-01-17', 'NY', '3000.00', '1', 'New York', 'New York County', '10001', 'TX-003', 'Product', 'Apparel', 'Y', 'Retail', ''],
-    ['2024-01-18', 'FL', '1200.00', '1', 'Miami', 'Miami-Dade County', '33101', 'TX-004', 'Digital', 'Media', 'Y', 'Consumer', ''],
-    ['2024-01-19', 'WA', '1800.00', '3', 'Seattle', 'King County', '98101', 'TX-005', 'Product', 'Home Goods', 'N', 'Retail', 'EC-34567']
+    ['2024-01-15', 'CA', '1500.00', '1', 'TX-001', 'Product', 'Electronics', 'N', 'Retail', 'EC-12345'],
+    ['2024-01-16', 'TX', '2500.00', '2', 'TX-002', 'Service', 'Software', 'N', 'Business', 'EC-23456'],
+    ['2024-01-17', 'NY', '3000.00', '1', 'TX-003', 'Product', 'Apparel', 'Y', 'Retail', ''],
+    ['2024-01-18', 'FL', '1200.00', '1', 'TX-004', 'Digital', 'Media', 'Y', 'Consumer', ''],
+    ['2024-01-19', 'WA', '1800.00', '3', 'TX-005', 'Product', 'Home Goods', 'N', 'Retail', 'EC-34567']
   ];
 
   const csvContent = [
@@ -358,19 +357,16 @@ const cleanCurrencyValue = (value: string): string => {
 
 const getColumnVariations = (standardColumn: string): string[] => {
   const variations: { [key: string]: string[] } = {
-    date: ['date', 'transaction_date', 'sale_date', 'order_date'],
-    state: ['state', 'state_code', 'ship_to_state', 'billing_state'],
-    sale_amount: ['sale_amount', 'amount', 'total', 'revenue', 'price'],
-    transaction_count: ['transaction_count', 'quantity', 'qty', 'count'],
-    city: ['city', 'customer_city', 'billing_city', 'shipping_city'],
-    county: ['county', 'customer_county', 'billing_county', 'shipping_county'],
-    zip_code: ['zip_code', 'zip', 'postal_code', 'zipcode'],
-    transaction_id: ['transaction_id', 'order_id', 'invoice_id'],
-    revenue_type: ['revenue_type', 'sales_type', 'transaction_type'],
-    product_category: ['product_category', 'category', 'product_type'],
-    marketplace_facilitator: ['marketplace_facilitator_flag', 'marketplace_flag'],
-    customer_type: ['customer_type', 'buyer_type', 'client_type'],
-    exemption_certificate: ['exemption_certificate_id', 'exemption_id', 'certificate_id']
+    date: ['date', 'transaction_date', 'sale_date', 'order_date', 'Transaction_Date'],
+    state: ['state', 'state_code', 'ship_to_state', 'billing_state', 'ShipTo_State', 'BillTo_State'],
+    sale_amount: ['sale_amount', 'amount', 'total', 'revenue', 'price', 'Extended_Amount'],
+    transaction_count: ['transaction_count', 'quantity', 'qty', 'count', 'Quantity'],
+    transaction_id: ['transaction_id', 'order_id', 'invoice_id', 'Transaction_ID'],
+    revenue_type: ['revenue_type', 'sales_type', 'transaction_type', 'Revenue_Type'],
+    product_category: ['product_category', 'category', 'product_type', 'Product_Category'],
+    marketplace_facilitator: ['marketplace_facilitator_flag', 'marketplace_flag', 'Marketplace_Facilitator_Flag'],
+    customer_type: ['customer_type', 'buyer_type', 'client_type', 'Customer_Type'],
+    exemption_certificate: ['exemption_certificate_id', 'exemption_id', 'certificate_id', 'Exemption_Certificate_ID']
   };
   
   return variations[standardColumn] || [];
