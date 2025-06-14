@@ -1,3 +1,5 @@
+// Update the NexusAnalysisDemo component to handle the case when Web Workers are not available
+
 import React, { useState } from 'react';
 import { useNexusAnalysis } from '../hooks/useNexusAnalysis';
 import { EngineOptions, NexusResult } from '../utils/nexusEngine/types';

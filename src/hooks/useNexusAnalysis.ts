@@ -1,5 +1,4 @@
-// useNexusAnalysis hook
-// React hook for integrating the Nexus Engine with the application
+// Update the useNexusAnalysis hook to use the main thread processing when Web Workers are not available
 
 import { useState, useCallback } from 'react';
 import { useNexusEngineWorker, useNexusEngine } from '../utils/nexusEngine/hooks';
