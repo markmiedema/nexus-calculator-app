@@ -1,0 +1,74 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://nexus-calculator.com/schemas/state_rules.schema.json",
+  "title": "State Nexus Rules Configuration",
+  "description": "Schema for state economic nexus threshold rules",
+  "type": "object",
+  "required": ["version", "last_updated", "source", "states"],
+  "properties": {
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Semantic version of this configuration"
+    },
+    "last_updated": {
+      "type": "string",
+      "format": "date",
+      "description": "Date this configuration was last updated (YYYY-MM-DD)"
+    },
+    "source": {
+      "type": "string",
+      "description": "Source of the data (e.g., 'Tax Foundation 2025 Q1')"
+    },
+    "states": {
+      "type": "object",
+      "description": "State-by-state nexus rules",
+      "patternProperties": {
+        "^[A-Z]{2}$": {
+          "type": "object",
+          "required": ["amount", "transactions", "effective_date", "rule_id"],
+          "properties": {
+            "amount": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Revenue threshold in USD (0 = no sales tax)"
+            },
+            "transactions": {
+              "oneOf": [
+                { "type": "number", "minimum": 1 },
+                { "type": "null" }
+              ],
+              "description": "Transaction count threshold (null if not applicable)"
+            },
+            "effective_date": {
+              "type": "string",
+              "format": "date",
+              "description": "When this rule became effective (YYYY-MM-DD)"
+            },
+            "end_date": {
+              "oneOf": [
+                { "type": "string", "format": "date" },
+                { "type": "null" }
+              ],
+              "description": "When superseded by new rule (null if current)"
+            },
+            "rule_id": {
+              "type": "string",
+              "pattern": "^[A-Z]{2}-\\d{4}-\\d{2}$",
+              "description": "Unique identifier (e.g., 'CA-2019-01')"
+            },
+            "notes": {
+              "type": "string",
+              "description": "Additional context or quirks about this rule"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "historical_rules": {
+      "type": "object",
+      "description": "Historical rule versions for multi-year exact calculations"
+    }
+  }
+}

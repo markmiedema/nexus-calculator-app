@@ -1,0 +1,417 @@
+# Nexus State Rules Configuration
+# Shared configuration used by both web app and CLI
+#
+# Source: State tax authority websites and Tax Foundation (2025 Q1)
+# Last updated: 2025-01-15
+#
+# Format:
+#   state_code: 2-letter postal abbreviation
+#   amount: Revenue threshold in USD (0 = no sales tax)
+#   transactions: Transaction count threshold (null = not applicable)
+#   effective_date: When this rule became effective (YYYY-MM-DD)
+#   end_date: When superseded by new rule (null = current)
+#   rule_id: Unique identifier for this version
+#   notes: Additional context or quirks
+
+version: "1.0.0"
+last_updated: "2025-01-15"
+source: "State tax authority websites, Tax Foundation 2025 Q1"
+
+states:
+  # States with revenue-only thresholds
+  AL:
+    amount: 250000
+    transactions: null
+    effective_date: "2019-01-01"
+    end_date: null
+    rule_id: "AL-2019-01"
+    notes: "Alabama has one of the highest thresholds"
+
+  AZ:
+    amount: 100000
+    transactions: null
+    effective_date: "2019-10-01"
+    end_date: null
+    rule_id: "AZ-2019-01"
+    notes: "Standard $100k threshold"
+
+  CA:
+    amount: 500000
+    transactions: null
+    effective_date: "2019-04-01"
+    end_date: null
+    rule_id: "CA-2019-01"
+    notes: "California has highest threshold due to size of economy"
+
+  CO:
+    amount: 100000
+    transactions: null
+    effective_date: "2019-06-01"
+    end_date: null
+    rule_id: "CO-2019-01"
+    notes: "Colorado also has notice and reporting requirements"
+
+  FL:
+    amount: 100000
+    transactions: null
+    effective_date: "2021-07-01"
+    end_date: null
+    rule_id: "FL-2021-01"
+    notes: "Florida adopted economic nexus later than most states"
+
+  HI:
+    amount: 100000
+    transactions: null
+    effective_date: "2018-07-01"
+    end_date: null
+    rule_id: "HI-2018-01"
+    notes: "Hawaii GET (General Excise Tax) applies broadly"
+
+  ID:
+    amount: 100000
+    transactions: null
+    effective_date: "2019-06-01"
+    end_date: null
+    rule_id: "ID-2019-01"
+
+  KS:
+    amount: 100000
+    transactions: null
+    effective_date: "2019-10-01"
+    end_date: null
+    rule_id: "KS-2019-01"
+
+  KY:
+    amount: 100000
+    transactions: null
+    effective_date: "2019-07-01"
+    end_date: null
+    rule_id: "KY-2019-01"
+
+  LA:
+    amount: 100000
+    transactions: null
+    effective_date: "2020-07-01"
+    end_date: null
+    rule_id: "LA-2020-01"
+    notes: "Louisiana has complex local tax rules"
+
+  ME:
+    amount: 100000
+    transactions: null
+    effective_date: "2019-07-01"
+    end_date: null
+    rule_id: "ME-2019-01"
+
+  MD:
+    amount: 100000
+    transactions: null
+    effective_date: "2018-10-01"
+    end_date: null
+    rule_id: "MD-2018-01"
+
+  MN:
+    amount: 100000
+    transactions: null
+    effective_date: "2019-10-01"
+    end_date: null
+    rule_id: "MN-2019-01"
+
+  MS:
+    amount: 250000
+    transactions: null
+    effective_date: "2018-09-01"
+    end_date: null
+    rule_id: "MS-2018-01"
+    notes: "Mississippi has higher threshold like Alabama"
+
+  NE:
+    amount: 100000
+    transactions: null
+    effective_date: "2019-04-01"
+    end_date: null
+    rule_id: "NE-2019-01"
+
+  NV:
+    amount: 100000
+    transactions: null
+    effective_date: "2019-10-01"
+    end_date: null
+    rule_id: "NV-2019-01"
+
+  NJ:
+    amount: 100000
+    transactions: null
+    effective_date: "2019-11-01"
+    end_date: null
+    rule_id: "NJ-2019-01"
+
+  NM:
+    amount: 100000
+    transactions: null
+    effective_date: "2019-07-01"
+    end_date: null
+    rule_id: "NM-2019-01"
+
+  NY:
+    amount: 500000
+    transactions: null
+    effective_date: "2019-06-01"
+    end_date: null
+    rule_id: "NY-2019-01"
+    notes: "New York has high threshold and additional reporting rules"
+
+  NC:
+    amount: 100000
+    transactions: null
+    effective_date: "2019-11-01"
+    end_date: null
+    rule_id: "NC-2019-01"
+
+  ND:
+    amount: 100000
+    transactions: null
+    effective_date: "2019-10-01"
+    end_date: null
+    rule_id: "ND-2019-01"
+
+  OH:
+    amount: 100000
+    transactions: null
+    effective_date: "2019-08-01"
+    end_date: null
+    rule_id: "OH-2019-01"
+
+  OK:
+    amount: 100000
+    transactions: null
+    effective_date: "2019-11-01"
+    end_date: null
+    rule_id: "OK-2019-01"
+
+  PA:
+    amount: 100000
+    transactions: null
+    effective_date: "2019-07-01"
+    end_date: null
+    rule_id: "PA-2019-01"
+
+  RI:
+    amount: 100000
+    transactions: null
+    effective_date: "2019-07-01"
+    end_date: null
+    rule_id: "RI-2019-01"
+
+  SC:
+    amount: 100000
+    transactions: null
+    effective_date: "2019-11-01"
+    end_date: null
+    rule_id: "SC-2019-01"
+
+  SD:
+    amount: 100000
+    transactions: null
+    effective_date: "2018-11-01"
+    end_date: null
+    rule_id: "SD-2018-01"
+    notes: "South Dakota v. Wayfair (2018) originated here"
+
+  TN:
+    amount: 100000
+    transactions: null
+    effective_date: "2019-10-01"
+    end_date: null
+    rule_id: "TN-2019-01"
+
+  TX:
+    amount: 500000
+    transactions: null
+    effective_date: "2019-10-01"
+    end_date: null
+    rule_id: "TX-2019-01"
+    notes: "Texas has high threshold due to large economy"
+
+  UT:
+    amount: 100000
+    transactions: null
+    effective_date: "2019-10-01"
+    end_date: null
+    rule_id: "UT-2019-01"
+
+  VT:
+    amount: 100000
+    transactions: null
+    effective_date: "2018-07-01"
+    end_date: null
+    rule_id: "VT-2018-01"
+
+  VA:
+    amount: 100000
+    transactions: null
+    effective_date: "2019-07-01"
+    end_date: null
+    rule_id: "VA-2019-01"
+
+  WV:
+    amount: 100000
+    transactions: null
+    effective_date: "2019-01-01"
+    end_date: null
+    rule_id: "WV-2019-01"
+
+  WY:
+    amount: 100000
+    transactions: null
+    effective_date: "2019-07-01"
+    end_date: null
+    rule_id: "WY-2019-01"
+
+  DC:
+    amount: 100000
+    transactions: null
+    effective_date: "2019-01-01"
+    end_date: null
+    rule_id: "DC-2019-01"
+
+  # States with both revenue AND transaction thresholds (OR condition)
+  AR:
+    amount: 100000
+    transactions: 200
+    effective_date: "2019-07-01"
+    end_date: null
+    rule_id: "AR-2019-01"
+    notes: "Either threshold triggers nexus"
+
+  CT:
+    amount: 100000
+    transactions: 200
+    effective_date: "2019-07-01"
+    end_date: null
+    rule_id: "CT-2019-01"
+    notes: "Either threshold triggers nexus"
+
+  GA:
+    amount: 100000
+    transactions: 200
+    effective_date: "2019-01-01"
+    end_date: null
+    rule_id: "GA-2019-01"
+    notes: "Either threshold triggers nexus"
+
+  IL:
+    amount: 100000
+    transactions: 200
+    effective_date: "2020-01-01"
+    end_date: null
+    rule_id: "IL-2020-01"
+    notes: "Either threshold triggers nexus"
+
+  IN:
+    amount: 100000
+    transactions: 200
+    effective_date: "2019-07-01"
+    end_date: null
+    rule_id: "IN-2019-01"
+    notes: "Either threshold triggers nexus"
+
+  IA:
+    amount: 100000
+    transactions: 200
+    effective_date: "2019-01-01"
+    end_date: null
+    rule_id: "IA-2019-01"
+    notes: "Either threshold triggers nexus"
+
+  MA:
+    amount: 100000
+    transactions: 200
+    effective_date: "2019-10-01"
+    end_date: null
+    rule_id: "MA-2019-01"
+    notes: "Either threshold triggers nexus"
+
+  MI:
+    amount: 100000
+    transactions: 200
+    effective_date: "2019-10-01"
+    end_date: null
+    rule_id: "MI-2019-01"
+    notes: "Either threshold triggers nexus"
+
+  MO:
+    amount: 100000
+    transactions: 200
+    effective_date: "2023-01-01"
+    end_date: null
+    rule_id: "MO-2023-01"
+    notes: "Missouri adopted economic nexus later; Either threshold triggers"
+
+  WA:
+    amount: 100000
+    transactions: 200
+    effective_date: "2019-03-01"
+    end_date: null
+    rule_id: "WA-2019-01"
+    notes: "Either threshold triggers nexus"
+
+  WI:
+    amount: 100000
+    transactions: 200
+    effective_date: "2019-10-01"
+    end_date: null
+    rule_id: "WI-2019-01"
+    notes: "Either threshold triggers nexus"
+
+  # States with no sales tax (amount = 0)
+  # Note: Alaska has local sales taxes but no statewide tax
+  AK:
+    amount: 0
+    transactions: null
+    effective_date: "2018-06-21"
+    end_date: null
+    rule_id: "AK-2018-01"
+    notes: "No statewide sales tax; some local jurisdictions have sales tax"
+
+  DE:
+    amount: 0
+    transactions: null
+    effective_date: "2018-06-21"
+    end_date: null
+    rule_id: "DE-2018-01"
+    notes: "No sales tax"
+
+  MT:
+    amount: 0
+    transactions: null
+    effective_date: "2018-06-21"
+    end_date: null
+    rule_id: "MT-2018-01"
+    notes: "No sales tax; some resort areas have local option tax"
+
+  NH:
+    amount: 0
+    transactions: null
+    effective_date: "2018-06-21"
+    end_date: null
+    rule_id: "NH-2018-01"
+    notes: "No sales tax"
+
+  OR:
+    amount: 0
+    transactions: null
+    effective_date: "2018-06-21"
+    end_date: null
+    rule_id: "OR-2018-01"
+    notes: "No sales tax"
+
+# Historical rules (for multi-year exact mode in v2)
+historical_rules:
+  # Example: California threshold before April 2019 would go here
+  # CA-2018-01:
+  #   amount: 0
+  #   transactions: null
+  #   effective_date: "2018-01-01"
+  #   end_date: "2019-03-31"
+  #   notes: "Before economic nexus"

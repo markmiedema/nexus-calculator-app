@@ -1,0 +1,379 @@
+# State Tax Rates Configuration
+# Combined average state and local sales tax rates
+#
+# Source: Tax Foundation, "State and Local Sales Tax Rates, 2025"
+# URL: https://taxfoundation.org/data/all/state/2025-sales-taxes/
+# Last updated: 2025-01-15
+#
+# Note: These are AVERAGE combined rates. Actual rates vary by locality.
+# Always verify with official state sources before filing.
+
+version: "1.0.0"
+last_updated: "2025-01-15"
+source: "Tax Foundation State and Local Sales Tax Rates, 2025"
+source_url: "https://taxfoundation.org/data/all/state/2025-sales-taxes/"
+
+# Format:
+#   state_rate: State-level tax rate (%)
+#   avg_local_rate: Average local tax rate (%)
+#   combined_rate: Average combined rate (%)
+#   max_local_rate: Maximum local rate in state (%)
+#   notes: Special considerations
+
+rates:
+  AL:
+    state_rate: 4.00
+    avg_local_rate: 5.22
+    combined_rate: 9.22
+    max_local_rate: 7.50
+    notes: "Counties and cities can impose additional taxes"
+
+  AK:
+    state_rate: 0.00
+    avg_local_rate: 1.76
+    combined_rate: 1.76
+    max_local_rate: 7.50
+    notes: "No state tax; only local jurisdictions"
+
+  AZ:
+    state_rate: 5.60
+    avg_local_rate: 2.80
+    combined_rate: 8.40
+    max_local_rate: 5.60
+    notes: "Transaction Privilege Tax (TPT) system"
+
+  AR:
+    state_rate: 6.50
+    avg_local_rate: 2.97
+    combined_rate: 9.47
+    max_local_rate: 5.125
+    notes: "One of the highest combined rates in US"
+
+  CA:
+    state_rate: 7.25
+    avg_local_rate: 1.43
+    combined_rate: 8.68
+    max_local_rate: 2.50
+    notes: "District taxes can push rates above 10% in some areas"
+
+  CO:
+    state_rate: 2.90
+    avg_local_rate: 4.82
+    combined_rate: 7.72
+    max_local_rate: 8.30
+    notes: "Low state rate but high local rates"
+
+  CT:
+    state_rate: 6.35
+    avg_local_rate: 0.00
+    combined_rate: 6.35
+    max_local_rate: 0.00
+    notes: "No local sales taxes"
+
+  DE:
+    state_rate: 0.00
+    avg_local_rate: 0.00
+    combined_rate: 0.00
+    max_local_rate: 0.00
+    notes: "No sales tax"
+
+  FL:
+    state_rate: 6.00
+    avg_local_rate: 1.08
+    combined_rate: 7.08
+    max_local_rate: 2.00
+    notes: "Discretionary sales surtax varies by county"
+
+  GA:
+    state_rate: 4.00
+    avg_local_rate: 3.35
+    combined_rate: 7.35
+    max_local_rate: 4.90
+    notes: "SPLOST (Special Purpose Local Option Sales Tax) common"
+
+  HI:
+    state_rate: 4.00
+    avg_local_rate: 0.44
+    combined_rate: 4.44
+    max_local_rate: 0.50
+    notes: "GET (General Excise Tax) - different from traditional sales tax"
+
+  ID:
+    state_rate: 6.00
+    avg_local_rate: 0.03
+    combined_rate: 6.03
+    max_local_rate: 3.00
+    notes: "Resort city taxes can apply"
+
+  IL:
+    state_rate: 6.25
+    avg_local_rate: 2.83
+    combined_rate: 9.08
+    max_local_rate: 4.75
+    notes: "Chicago has some of highest rates (10.25%)"
+
+  IN:
+    state_rate: 7.00
+    avg_local_rate: 0.00
+    combined_rate: 7.00
+    max_local_rate: 0.00
+    notes: "No local sales taxes"
+
+  IA:
+    state_rate: 6.00
+    avg_local_rate: 0.94
+    combined_rate: 6.94
+    max_local_rate: 1.00
+    notes: "Local option sales tax limited to 1%"
+
+  KS:
+    state_rate: 6.50
+    avg_local_rate: 2.19
+    combined_rate: 8.69
+    max_local_rate: 4.00
+    notes: "Counties and cities both impose taxes"
+
+  KY:
+    state_rate: 6.00
+    avg_local_rate: 0.00
+    combined_rate: 6.00
+    max_local_rate: 0.00
+    notes: "No local sales taxes"
+
+  LA:
+    state_rate: 4.45
+    avg_local_rate: 5.07
+    combined_rate: 9.52
+    max_local_rate: 7.00
+    notes: "Highest combined rate in US; complex parish system"
+
+  ME:
+    state_rate: 5.50
+    avg_local_rate: 0.00
+    combined_rate: 5.50
+    max_local_rate: 0.00
+    notes: "No local sales taxes"
+
+  MD:
+    state_rate: 6.00
+    avg_local_rate: 0.00
+    combined_rate: 6.00
+    max_local_rate: 0.00
+    notes: "No local sales taxes"
+
+  MA:
+    state_rate: 6.25
+    avg_local_rate: 0.00
+    combined_rate: 6.25
+    max_local_rate: 0.00
+    notes: "No local sales taxes"
+
+  MI:
+    state_rate: 6.00
+    avg_local_rate: 0.00
+    combined_rate: 6.00
+    max_local_rate: 0.00
+    notes: "No local sales taxes"
+
+  MN:
+    state_rate: 6.875
+    avg_local_rate: 0.585
+    combined_rate: 7.46
+    max_local_rate: 2.00
+    notes: "Minneapolis and other cities have local taxes"
+
+  MS:
+    state_rate: 7.00
+    avg_local_rate: 0.07
+    combined_rate: 7.07
+    max_local_rate: 1.00
+    notes: "Highest state-level rate in US"
+
+  MO:
+    state_rate: 4.225
+    avg_local_rate: 3.955
+    combined_rate: 8.18
+    max_local_rate: 5.875
+    notes: "Kansas City and St. Louis have high local rates"
+
+  MT:
+    state_rate: 0.00
+    avg_local_rate: 0.00
+    combined_rate: 0.00
+    max_local_rate: 3.00
+    notes: "No sales tax; resort areas can impose up to 3%"
+
+  NE:
+    state_rate: 5.50
+    avg_local_rate: 1.44
+    combined_rate: 6.94
+    max_local_rate: 2.00
+    notes: "Local option sales tax varies"
+
+  NV:
+    state_rate: 6.85
+    avg_local_rate: 1.38
+    combined_rate: 8.23
+    max_local_rate: 1.65
+    notes: "Las Vegas area has higher rates"
+
+  NH:
+    state_rate: 0.00
+    avg_local_rate: 0.00
+    combined_rate: 0.00
+    max_local_rate: 0.00
+    notes: "No sales tax"
+
+  NJ:
+    state_rate: 6.625
+    avg_local_rate: -0.025
+    combined_rate: 6.60
+    max_local_rate: 0.00
+    notes: "Urban Enterprise Zones have reduced rates"
+
+  NM:
+    state_rate: 5.125
+    avg_local_rate: 2.705
+    combined_rate: 7.83
+    max_local_rate: 4.063
+    notes: "Gross receipts tax - different structure than sales tax"
+
+  NY:
+    state_rate: 4.00
+    avg_local_rate: 4.52
+    combined_rate: 8.52
+    max_local_rate: 4.875
+    notes: "NYC has 4.5% city tax plus county tax"
+
+  NC:
+    state_rate: 4.75
+    avg_local_rate: 2.23
+    combined_rate: 6.98
+    max_local_rate: 2.75
+    notes: "County rates vary"
+
+  ND:
+    state_rate: 5.00
+    avg_local_rate: 1.86
+    combined_rate: 6.86
+    max_local_rate: 3.50
+    notes: "Cities can impose up to 3% additional"
+
+  OH:
+    state_rate: 5.75
+    avg_local_rate: 1.48
+    combined_rate: 7.23
+    max_local_rate: 2.25
+    notes: "County rates vary"
+
+  OK:
+    state_rate: 4.50
+    avg_local_rate: 4.45
+    combined_rate: 8.95
+    max_local_rate: 7.00
+    notes: "High local rates offset low state rate"
+
+  OR:
+    state_rate: 0.00
+    avg_local_rate: 0.00
+    combined_rate: 0.00
+    max_local_rate: 0.00
+    notes: "No sales tax"
+
+  PA:
+    state_rate: 6.00
+    avg_local_rate: 0.34
+    combined_rate: 6.34
+    max_local_rate: 2.00
+    notes: "Philadelphia and Allegheny County have local taxes"
+
+  RI:
+    state_rate: 7.00
+    avg_local_rate: 0.00
+    combined_rate: 7.00
+    max_local_rate: 0.00
+    notes: "No local sales taxes"
+
+  SC:
+    state_rate: 6.00
+    avg_local_rate: 1.46
+    combined_rate: 7.46
+    max_local_rate: 3.00
+    notes: "Counties can impose up to 3% additional"
+
+  SD:
+    state_rate: 4.50
+    avg_local_rate: 1.90
+    combined_rate: 6.40
+    max_local_rate: 4.50
+    notes: "Municipal rates vary significantly"
+
+  TN:
+    state_rate: 7.00
+    avg_local_rate: 2.55
+    combined_rate: 9.55
+    max_local_rate: 2.75
+    notes: "Highest combined rate tied with Louisiana"
+
+  TX:
+    state_rate: 6.25
+    avg_local_rate: 1.94
+    combined_rate: 8.19
+    max_local_rate: 2.00
+    notes: "Local rates capped at 2%"
+
+  UT:
+    state_rate: 6.10
+    avg_local_rate: 1.09
+    combined_rate: 7.19
+    max_local_rate: 3.35
+    notes: "County option and municipal rates"
+
+  VT:
+    state_rate: 6.00
+    avg_local_rate: 0.24
+    combined_rate: 6.24
+    max_local_rate: 1.00
+    notes: "Local option tax up to 1%"
+
+  VA:
+    state_rate: 5.30
+    avg_local_rate: 0.43
+    combined_rate: 5.73
+    max_local_rate: 0.70
+    notes: "Northern Virginia and Hampton Roads have regional taxes"
+
+  WA:
+    state_rate: 6.50
+    avg_local_rate: 2.73
+    combined_rate: 9.23
+    max_local_rate: 4.00
+    notes: "Seattle area has high local rates"
+
+  WV:
+    state_rate: 6.00
+    avg_local_rate: 0.41
+    combined_rate: 6.41
+    max_local_rate: 1.00
+    notes: "Municipal rates allowed"
+
+  WI:
+    state_rate: 5.00
+    avg_local_rate: 0.43
+    combined_rate: 5.43
+    max_local_rate: 1.75
+    notes: "County and stadium district taxes"
+
+  WY:
+    state_rate: 4.00
+    avg_local_rate: 1.33
+    combined_rate: 5.33
+    max_local_rate: 2.00
+    notes: "Resort area taxes allowed"
+
+  DC:
+    state_rate: 6.00
+    avg_local_rate: 0.00
+    combined_rate: 6.00
+    max_local_rate: 0.00
+    notes: "No additional local taxes"
