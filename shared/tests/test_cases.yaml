@@ -1,0 +1,400 @@
+# Shared Test Cases for Nexus Engine Parity Testing
+#
+# These test cases are used by both TypeScript and Python implementations
+# to ensure they produce identical results.
+
+version: "1.0.0"
+description: "Test cases for nexus calculation engine parity"
+
+# Test case format:
+# - name: Human-readable description
+# - transactions: List of transaction objects
+# - options: Engine options (year, ignore_marketplace, etc.)
+# - expected: Expected results
+
+test_cases:
+  # Basic revenue threshold tests
+  - name: "California revenue breach - single transaction"
+    transactions:
+      - id: "tx-1"
+        state_code: "CA"
+        amount: 600000
+        date: "2024-06-15"
+        revenue_type: "taxable"
+    options:
+      mode: "singleYear"
+      analysisYear: 2024
+    expected:
+      states:
+        CA:
+          exceeded: true
+          breach_type: "revenue"
+          breach_date: "2024-06-15"
+          total_revenue: 600000
+          total_transactions: 1
+
+  - name: "California just under threshold"
+    transactions:
+      - id: "tx-1"
+        state_code: "CA"
+        amount: 499999
+        date: "2024-06-15"
+    options:
+      mode: "singleYear"
+      analysisYear: 2024
+    expected:
+      states:
+        CA:
+          exceeded: false
+          breach_type: null
+          total_revenue: 499999
+          total_transactions: 1
+
+  - name: "California multiple transactions - cumulative breach"
+    transactions:
+      - id: "tx-1"
+        state_code: "CA"
+        amount: 100000
+        date: "2024-01-15"
+      - id: "tx-2"
+        state_code: "CA"
+        amount: 100000
+        date: "2024-02-20"
+      - id: "tx-3"
+        state_code: "CA"
+        amount: 100000
+        date: "2024-03-10"
+      - id: "tx-4"
+        state_code: "CA"
+        amount: 100000
+        date: "2024-04-05"
+      - id: "tx-5"
+        state_code: "CA"
+        amount: 100000
+        date: "2024-05-12"
+      - id: "tx-6"
+        state_code: "CA"
+        amount: 50000
+        date: "2024-06-18"
+    options:
+      mode: "singleYear"
+      analysisYear: 2024
+    expected:
+      states:
+        CA:
+          exceeded: true
+          breach_type: "revenue"
+          breach_date: "2024-05-12"  # 5th transaction crosses $500k
+          breach_transaction_id: "tx-5"
+          total_revenue: 550000
+          total_transactions: 6
+
+  # Transaction count threshold tests
+  - name: "Washington transaction count breach"
+    transactions:
+      - id: "tx-1"
+        state_code: "WA"
+        amount: 100
+        date: "2024-01-01"
+      - id: "tx-2"
+        state_code: "WA"
+        amount: 100
+        date: "2024-01-02"
+      # ... generate 200 transactions
+    options:
+      mode: "singleYear"
+      analysisYear: 2024
+    expected:
+      states:
+        WA:
+          exceeded: true
+          breach_type: "transactions"
+          total_transactions: 200
+
+  - name: "Washington revenue breach before transaction threshold"
+    transactions:
+      - id: "tx-1"
+        state_code: "WA"
+        amount: 150000
+        date: "2024-01-15"
+    options:
+      mode: "singleYear"
+      analysisYear: 2024
+    expected:
+      states:
+        WA:
+          exceeded: true
+          breach_type: "revenue"
+          breach_date: "2024-01-15"
+          total_revenue: 150000
+          total_transactions: 1
+
+  # Multi-state tests
+  - name: "Multiple states - some with nexus, some without"
+    transactions:
+      - id: "tx-1"
+        state_code: "CA"
+        amount: 600000
+        date: "2024-03-15"
+      - id: "tx-2"
+        state_code: "NY"
+        amount: 600000
+        date: "2024-04-20"
+      - id: "tx-3"
+        state_code: "TX"
+        amount: 400000
+        date: "2024-05-10"
+      - id: "tx-4"
+        state_code: "WA"
+        amount: 50000
+        date: "2024-06-05"
+    options:
+      mode: "singleYear"
+      analysisYear: 2024
+    expected:
+      states:
+        CA:
+          exceeded: true
+          breach_type: "revenue"
+        NY:
+          exceeded: true
+          breach_type: "revenue"
+        TX:
+          exceeded: false  # Under $500k threshold
+        WA:
+          exceeded: false  # Under both thresholds
+
+  # Marketplace facilitator filtering
+  - name: "Ignore marketplace transactions"
+    transactions:
+      - id: "tx-1"
+        state_code: "CA"
+        amount: 300000
+        date: "2024-01-15"
+        revenue_type: "taxable"
+      - id: "tx-2"
+        state_code: "CA"
+        amount: 300000
+        date: "2024-02-20"
+        revenue_type: "marketplace"
+    options:
+      mode: "singleYear"
+      analysisYear: 2024
+      ignoreMarketplace: true
+    expected:
+      states:
+        CA:
+          exceeded: false  # Only $300k after filtering marketplace
+          total_revenue: 300000
+
+  - name: "Include marketplace transactions"
+    transactions:
+      - id: "tx-1"
+        state_code: "CA"
+        amount: 300000
+        date: "2024-01-15"
+        revenue_type: "taxable"
+      - id: "tx-2"
+        state_code: "CA"
+        amount: 300000
+        date: "2024-02-20"
+        revenue_type: "marketplace"
+    options:
+      mode: "singleYear"
+      analysisYear: 2024
+      ignoreMarketplace: false
+    expected:
+      states:
+        CA:
+          exceeded: true  # $600k total
+          total_revenue: 600000
+
+  # Negative amounts (returns/refunds)
+  - name: "Negative amounts excluded by default"
+    transactions:
+      - id: "tx-1"
+        state_code: "CA"
+        amount: 550000
+        date: "2024-01-15"
+      - id: "tx-2"
+        state_code: "CA"
+        amount: -100000
+        date: "2024-02-20"
+    options:
+      mode: "singleYear"
+      analysisYear: 2024
+      includeNegativeAmounts: false
+    expected:
+      states:
+        CA:
+          exceeded: true
+          total_revenue: 550000  # Negative excluded
+
+  - name: "Negative amounts included"
+    transactions:
+      - id: "tx-1"
+        state_code: "CA"
+        amount: 550000
+        date: "2024-01-15"
+      - id: "tx-2"
+        state_code: "CA"
+        amount: -100000
+        date: "2024-02-20"
+    options:
+      mode: "singleYear"
+      analysisYear: 2024
+      includeNegativeAmounts: true
+    expected:
+      states:
+        CA:
+          exceeded: false  # Net $450k after returns
+          total_revenue: 450000
+
+  # No sales tax states
+  - name: "Oregon - no sales tax state"
+    transactions:
+      - id: "tx-1"
+        state_code: "OR"
+        amount: 1000000
+        date: "2024-01-15"
+    options:
+      mode: "singleYear"
+      analysisYear: 2024
+    expected:
+      states:
+        OR:
+          exceeded: false  # No sales tax = no nexus
+          threshold_revenue: 0
+
+  # Edge cases
+  - name: "Exact threshold amount"
+    transactions:
+      - id: "tx-1"
+        state_code: "CA"
+        amount: 500000
+        date: "2024-01-15"
+    options:
+      mode: "singleYear"
+      analysisYear: 2024
+    expected:
+      states:
+        CA:
+          exceeded: true  # >= threshold
+          breach_type: "revenue"
+          total_revenue: 500000
+
+  - name: "Same-day transactions in order"
+    transactions:
+      - id: "tx-1"
+        state_code: "CA"
+        amount: 200000
+        date: "2024-06-15"
+      - id: "tx-2"
+        state_code: "CA"
+        amount: 200000
+        date: "2024-06-15"
+      - id: "tx-3"
+        state_code: "CA"
+        amount: 200000
+        date: "2024-06-15"
+    options:
+      mode: "singleYear"
+      analysisYear: 2024
+    expected:
+      states:
+        CA:
+          exceeded: true
+          breach_date: "2024-06-15"
+          breach_transaction_id: "tx-3"  # 3rd transaction crosses threshold
+
+  # Multi-year estimate mode
+  - name: "Multi-year estimate - breach in first year"
+    transactions:
+      - id: "tx-1"
+        state_code: "CA"
+        amount: 600000
+        date: "2022-03-15"
+      - id: "tx-2"
+        state_code: "CA"
+        amount: 400000
+        date: "2023-05-20"
+      - id: "tx-3"
+        state_code: "CA"
+        amount: 450000
+        date: "2024-08-10"
+    options:
+      mode: "multiYearEstimate"
+      yearRange: [2022, 2024]
+    expected:
+      states:
+        CA:
+          exceeded: true
+          breach_date: "2022-03-15"  # First year breach
+          period_qualified: "2022"
+          estimate_mode: true
+
+  # Invalid state codes
+  - name: "Invalid state code filtered"
+    transactions:
+      - id: "tx-1"
+        state_code: "XX"
+        amount: 1000000
+        date: "2024-01-15"
+      - id: "tx-2"
+        state_code: "CA"
+        amount: 600000
+        date: "2024-02-20"
+    options:
+      mode: "singleYear"
+      analysisYear: 2024
+    expected:
+      warnings:
+        - "Filtered out transactions with invalid state codes: XX"
+      states:
+        CA:
+          exceeded: true
+
+  # Year filtering
+  - name: "Only analyze specified year"
+    transactions:
+      - id: "tx-1"
+        state_code: "CA"
+        amount: 300000
+        date: "2023-01-15"
+      - id: "tx-2"
+        state_code: "CA"
+        amount: 300000
+        date: "2024-02-20"
+    options:
+      mode: "singleYear"
+      analysisYear: 2024
+    expected:
+      states:
+        CA:
+          exceeded: false  # Only 2024 transactions counted
+          total_revenue: 300000
+          total_transactions: 1
+
+# Performance test cases (for benchmarking only)
+performance_tests:
+  - name: "Large dataset - 10,000 transactions"
+    generate:
+      count: 10000
+      states: ["CA", "NY", "TX", "FL", "WA"]
+      date_range: ["2024-01-01", "2024-12-31"]
+      amount_range: [100, 5000]
+    options:
+      mode: "singleYear"
+      analysisYear: 2024
+    expected_max_time_ms: 1000  # Should complete in < 1 second
+
+  - name: "Large dataset - 100,000 transactions"
+    generate:
+      count: 100000
+      states: ["CA", "NY", "TX", "FL", "WA"]
+      date_range: ["2024-01-01", "2024-12-31"]
+      amount_range: [100, 5000]
+    options:
+      mode: "singleYear"
+      analysisYear: 2024
+    expected_max_time_ms: 5000  # Should complete in < 5 seconds
